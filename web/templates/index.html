@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mafia Bot — Web Admin Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background: #090514;
+            color: #f1f5f9;
+        }
+        .glass-card {
+            background: rgba(22, 14, 38, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(139, 92, 246, 0.15);
+        }
+        .nav-btn.active {
+            background: linear-gradient(135deg, #7c3aed, #4f46e5);
+            color: #ffffff;
+            box-shadow: 0 4px 20px rgba(124, 58, 237, 0.4);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+    <!-- Top Navigation -->
+    <header class="glass-card sticky top-0 z-40 border-b border-purple-500/20 px-6 py-4 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 bg-gradient-to-tr from-purple-600 to-indigo-500 rounded-xl flex items-center justify-center text-xl shadow-lg shadow-purple-500/30">
+                🎩
+            </div>
+            <div>
+                <h1 class="font-extrabold text-lg text-white tracking-wide flex items-center gap-2">
+                    MAFIA BOT DASHBOARD
+                    <span class="text-[10px] bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded-full border border-purple-500/30 uppercase tracking-wider">Admin v2.0</span>
+                </h1>
+                <p class="text-xs text-purple-400/60">Boshqaruv, Narxlar, Do'kon va Jonli O'yinlar</p>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-4">
+            <div class="hidden sm:flex items-center gap-2 text-xs bg-purple-950/60 border border-purple-500/30 px-3 py-1.5 rounded-xl">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span class="text-purple-200">Server Holati: Faol</span>
+            </div>
+            <a href="/logout" class="text-xs bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-500/30 px-3.5 py-1.5 rounded-xl transition font-semibold">
+                Chiqish 🚪
+            </a>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-6">
+
+        <!-- Stat Cards -->
+        <div class="grid grid-cols-2 lg:grid-cols-5 gap-4">
+            <div class="glass-card p-4 rounded-2xl relative overflow-hidden group">
+                <div class="text-2xl mb-1">👥</div>
+                <div class="text-xs font-semibold text-purple-300/70 uppercase tracking-wider">Foydalanuvchilar</div>
+                <div class="text-2xl font-extrabold text-white mt-1">{{ stats.total_users | default(0) }}</div>
+                <div class="text-[10px] text-purple-400/60 mt-1">Ro'yxatdan o'tgan</div>
+            </div>
+
+            <div class="glass-card p-4 rounded-2xl relative overflow-hidden group">
+                <div class="text-2xl mb-1">🎮</div>
+                <div class="text-xs font-semibold text-purple-300/70 uppercase tracking-wider">Faol O'yinlar</div>
+                <div class="text-2xl font-extrabold text-emerald-400 mt-1">{{ active_games | length }}</div>
+                <div class="text-[10px] text-emerald-400/70 mt-1">Ayni paytda guruhlarda</div>
+            </div>
+
+            <div class="glass-card p-4 rounded-2xl relative overflow-hidden group">
+                <div class="text-2xl mb-1">💰</div>
+                <div class="text-xs font-semibold text-purple-300/70 uppercase tracking-wider">Tizimdagi Pul</div>
+                <div class="text-2xl font-extrabold text-amber-400 mt-1">{{ stats.total_pul | default(0) }}</div>
+                <div class="text-[10px] text-amber-400/60 mt-1">Tanga aylanmasi</div>
+            </div>
+
+            <div class="glass-card p-4 rounded-2xl relative overflow-hidden group">
+                <div class="text-2xl mb-1">💎</div>
+                <div class="text-xs font-semibold text-purple-300/70 uppercase tracking-wider">Tizimdagi Almaz</div>
+                <div class="text-2xl font-extrabold text-cyan-400 mt-1">{{ stats.total_almaz | default(0) }}</div>
+                <div class="text-[10px] text-cyan-400/60 mt-1">Premium valyuta</div>
+            </div>
+
+            <div class="glass-card p-4 rounded-2xl relative overflow-hidden group col-span-2 lg:col-span-1">
+                <div class="text-2xl mb-1">🕹️</div>
+                <div class="text-xs font-semibold text-purple-300/70 uppercase tracking-wider">Jami O'yinlar</div>
+                <div class="text-2xl font-extrabold text-purple-300 mt-1">{{ stats.total_games | default(0) }}</div>
+                <div class="text-[10px] text-purple-400/60 mt-1">Yakunlangan partiyalar</div>
+            </div>
+        </div>
+
+        <!-- Tab Controls -->
+        <div class="flex items-center gap-2 border-b border-purple-500/20 pb-2 overflow-x-auto">
+            <button onclick="switchTab('users')" id="tab-users-btn" class="nav-btn active px-4 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap">
+                👤 Foydalanuvchilar & Balans
+            </button>
+            <button onclick="switchTab('stars')" id="tab-stars-btn" class="nav-btn px-4 py-2 rounded-xl text-xs font-bold text-purple-300 hover:text-white transition whitespace-nowrap">
+                ⭐️ Stars Paketlari & Narxlar
+            </button>
+            <button onclick="switchTab('shop')" id="tab-shop-btn" class="nav-btn px-4 py-2 rounded-xl text-xs font-bold text-purple-300 hover:text-white transition whitespace-nowrap">
+                🛍️ Do'kon & Buyumlar
+            </button>
+            <button onclick="switchTab('exchange')" id="tab-exchange-btn" class="nav-btn px-4 py-2 rounded-xl text-xs font-bold text-purple-300 hover:text-white transition whitespace-nowrap">
+                🔄 Valyuta Kursi
+            </button>
+            <button onclick="switchTab('games')" id="tab-games-btn" class="nav-btn px-4 py-2 rounded-xl text-xs font-bold text-purple-300 hover:text-white transition whitespace-nowrap">
+                🎮 Jonli O'yinlar ({{ active_games | length }})
+            </button>
+            <button onclick="switchTab('cards')" id="tab-cards-btn" class="nav-btn px-4 py-2 rounded-xl text-xs font-bold text-purple-300 hover:text-white transition whitespace-nowrap">
+                💳 Karta To'lovlari (Uzcard / Humo)
+            </button>
+        </div>
+
+        <!-- 1. Foydalanuvchilar Tabi -->
+        <div id="tab-users" class="space-y-4">
+            <div class="flex flex-col sm:flex-row items-center justify-between gap-4 glass-card p-4 rounded-2xl">
+                <form method="GET" action="/" class="w-full sm:w-80 flex items-center gap-2">
+                    <input type="text" name="q" value="{{ search_query }}" placeholder="ID, Username yoki ism bo'yicha qidiruv..."
+                           class="w-full px-3.5 py-2 rounded-xl bg-purple-950/60 border border-purple-500/30 text-xs text-white placeholder-purple-400/40 focus:outline-none focus:border-purple-400">
+                    <button type="submit" class="px-4 py-2 bg-purple-600 hover:bg-purple-500 rounded-xl text-xs font-bold transition">
+                        Qidirish
+                    </button>
+                </form>
+                <div class="text-xs text-purple-300/70">
+                    Jami topildi: <b>{{ users | length }}</b> ta foydalanuvchi
+                </div>
+            </div>
+
+            <div class="glass-card rounded-2xl overflow-hidden border border-purple-500/20">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-purple-950/50 text-purple-300 uppercase tracking-wider text-[11px] border-b border-purple-500/20">
+                            <tr>
+                                <th class="py-3 px-4">ID</th>
+                                <th class="py-3 px-4">Foydalanuvchi</th>
+                                <th class="py-3 px-4">Telefon 📱</th>
+                                <th class="py-3 px-4">Daraja</th>
+                                <th class="py-3 px-4">Pul 💰</th>
+                                <th class="py-3 px-4">Almaz 💎</th>
+                                <th class="py-3 px-4">Oxirgi Faollik ⏱</th>
+                                <th class="py-3 px-4">Holat</th>
+                                <th class="py-3 px-4 text-right">Amallar</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-purple-500/10">
+                            {% for u in users %}
+                            <tr class="hover:bg-purple-900/20 transition">
+                                <td class="py-3 px-4 font-mono text-purple-300"><code>{{ u.id }}</code></td>
+                                <td class="py-3 px-4">
+                                    <div class="font-bold text-white">{{ u.full_name }}</div>
+                                    <div class="text-purple-400/60 text-[10px]">@{{ u.username or 'yo\'q' }}</div>
+                                </td>
+                                <td class="py-3 px-4">
+                                    {% if u.phone_number %}
+                                    <span class="text-emerald-400 font-mono text-xs font-semibold">📱 {{ u.phone_number }}</span>
+                                    {% else %}
+                                    <span class="text-purple-400/40 text-xs italic">Ulangan emas</span>
+                                    {% endif %}
+                                </td>
+                                <td class="py-3 px-4">
+                                    <span class="bg-purple-500/20 text-purple-200 px-2 py-0.5 rounded-lg border border-purple-500/30 font-semibold">
+                                        {{ u.level }}-daraja ({{ u.xp }} XP)
+                                    </span>
+                                </td>
+                                <td class="py-3 px-4 font-bold text-amber-400">{{ u.pul }}</td>
+                                <td class="py-3 px-4 font-bold text-cyan-400">{{ u.almaz }}</td>
+                                <td class="py-3 px-4 text-[11px] text-purple-300/70 font-mono">
+                                    {{ u.last_active or 'Hozirgina' }}
+                                </td>
+                                <td class="py-3 px-4">
+                                    {% if u.is_banned %}
+                                    <span class="bg-red-500/20 text-red-300 px-2 py-0.5 rounded-lg border border-red-500/30 text-[10px] font-bold">🚫 BLOKLANGAN</span>
+                                    {% else %}
+                                    <span class="bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-lg border border-emerald-500/30 text-[10px] font-bold">✅ FAOL</span>
+                                    {% endif %}
+                                </td>
+                                <td class="py-3 px-4 text-right space-x-2">
+                                    <button onclick="openBalanceModal({{ u.id }}, '{{ u.full_name | escape }}', {{ u.pul }}, {{ u.almaz }})"
+                                            class="px-2.5 py-1 bg-purple-600/30 hover:bg-purple-600/50 border border-purple-500/40 text-purple-200 rounded-lg transition font-semibold">
+                                        ✏️ Balans
+                                    </button>
+                                    <form action="/user/toggle_ban" method="POST" class="inline">
+                                        <input type="hidden" name="user_id" value="{{ u.id }}">
+                                        <input type="hidden" name="ban_status" value="{{ 0 if u.is_banned else 1 }}">
+                                        <button type="submit"
+                                                class="px-2.5 py-1 {{ 'bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 border-emerald-500/40' if u.is_banned else 'bg-red-500/20 text-red-300 hover:bg-red-500/30 border-red-500/40' }} border rounded-lg transition font-semibold">
+                                            {{ 'Unban' if u.is_banned else 'Ban' }}
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="9" class="py-8 text-center text-purple-400/60">Foydalanuvchilar topilmadi</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. Stars Paketlari Tabi -->
+        <div id="tab-stars" class="space-y-4 hidden">
+            <div class="glass-card p-4 rounded-2xl flex items-center justify-between">
+                <div>
+                    <h3 class="font-bold text-sm text-white">⭐️ Telegram Stars Narxlari va Paketlari</h3>
+                    <p class="text-xs text-purple-300/70">O'yinchilar bot orqali Stars evaziga Almaz va Pul sotib olish narxlarini shu yerdan o'zgartiring</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {% for p in star_pkgs %}
+                <div class="glass-card p-5 rounded-2xl border border-purple-500/20 relative">
+                    <form action="/package/update" method="POST" class="space-y-3">
+                        <input type="hidden" name="pkg_id" value="{{ p.id }}">
+
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold uppercase tracking-wider {{ 'text-cyan-400' if p.package_type == 'almaz' else 'text-amber-400' }}">
+                                {{ '💎 ALMAZ PAKETI' if p.package_type == 'almaz' else '💰 PUL PAKETI' }}
+                            </span>
+                            <span class="text-[10px] text-purple-400/60 font-mono">ID: #{{ p.id }}</span>
+                        </div>
+
+                        <div>
+                            <label class="block text-[11px] text-purple-300 mb-1">Stars Narxi (⭐️ XTR)</label>
+                            <input type="number" name="stars_price" value="{{ p.stars_price }}" required
+                                   class="w-full px-3 py-1.5 rounded-xl bg-purple-950/60 border border-purple-500/30 text-white text-xs">
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-[11px] text-purple-300 mb-1">Asosiy Miqdor</label>
+                                <input type="number" name="amount" value="{{ p.amount }}" required
+                                       class="w-full px-3 py-1.5 rounded-xl bg-purple-950/60 border border-purple-500/30 text-white text-xs">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] text-purple-300 mb-1">Bonus Miqdor</label>
+                                <input type="number" name="bonus" value="{{ p.bonus }}" required
+                                       class="w-full px-3 py-1.5 rounded-xl bg-purple-950/60 border border-purple-500/30 text-white text-xs">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-[11px] text-purple-300 mb-1">Holat</label>
+                            <select name="is_active" class="w-full px-3 py-1.5 rounded-xl bg-purple-950/60 border border-purple-500/30 text-white text-xs">
+                                <option value="1" {{ 'selected' if p.is_active else '' }}>Faol (Ochiq)</option>
+                                <option value="0" {{ 'selected' if not p.is_active else '' }}>O'chirilgan (Yashirin)</option>
+                            </select>
+                        </div>
+
+                        <button type="submit" class="w-full py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-bold transition">
+                            Saqlash 💾
+                        </button>
+                    </form>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- 3. Do'kon Buyumlari Tabi -->
+        <div id="tab-shop" class="space-y-4 hidden">
+            <div class="glass-card p-4 rounded-2xl flex items-center justify-between">
+                <div>
+                    <h3 class="font-bold text-sm text-white">🛍️ Do'kon Buyumlari va Narxlari</h3>
+                    <p class="text-xs text-purple-300/70">O'yindagi artefaktlar, himoya vositalari va VIP narxlarini tahrirlash</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {% for it in items %}
+                <div class="glass-card p-5 rounded-2xl border border-purple-500/20">
+                    <form action="/item/update" method="POST" class="space-y-3">
+                        <input type="hidden" name="code" value="{{ it.code }}">
+
+                        <div class="flex items-center gap-2 mb-2">
+                            <span class="text-2xl">{{ it.icon }}</span>
+                            <div class="flex-1">
+                                <input type="text" name="name" value="{{ it.name }}" required
+                                       class="w-full px-2.5 py-1 rounded-lg bg-purple-950/60 border border-purple-500/30 text-xs font-bold text-white">
+                                <div class="text-[10px] text-purple-400/60 font-mono mt-0.5">{{ it.code }}</div>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-[11px] text-purple-300 mb-1">Pul Narxi 💰</label>
+                                <input type="number" name="price_pul" value="{{ it.price_pul }}" required
+                                       class="w-full px-3 py-1.5 rounded-xl bg-purple-950/60 border border-purple-500/30 text-white text-xs">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] text-purple-300 mb-1">Almaz Narxi 💎</label>
+                                <input type="number" name="price_almaz" value="{{ it.price_almaz }}" required
+                                       class="w-full px-3 py-1.5 rounded-xl bg-purple-950/60 border border-purple-500/30 text-white text-xs">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-[11px] text-purple-300 mb-1">Ta'rif</label>
+                            <textarea name="description" rows="2"
+                                      class="w-full px-3 py-1.5 rounded-xl bg-purple-950/60 border border-purple-500/30 text-white text-xs">{{ it.description }}</textarea>
+                        </div>
+
+                        <div>
+                            <label class="block text-[11px] text-purple-300 mb-1">Holat</label>
+                            <select name="is_active" class="w-full px-3 py-1.5 rounded-xl bg-purple-950/60 border border-purple-500/30 text-white text-xs">
+                                <option value="1" {{ 'selected' if it.is_active else '' }}>Sotuvda mavjud</option>
+                                <option value="0" {{ 'selected' if not it.is_active else '' }}>O'chirilgan</option>
+                            </select>
+                        </div>
+
+                        <button type="submit" class="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition">
+                            Yangilash 💾
+                        </button>
+                    </form>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- 4. Valyuta Kursi Tabi -->
+        <div id="tab-exchange" class="space-y-4 hidden max-w-lg mx-auto">
+            <div class="glass-card p-6 rounded-3xl border border-purple-500/20 text-center">
+                <div class="text-4xl mb-3">🔄</div>
+                <h3 class="font-extrabold text-lg text-white mb-1">Almaz ➔ Pul Ayirboshlash Kursi</h3>
+                <p class="text-xs text-purple-300/70 mb-6">O'yinchilar bot ichida 1 ta Almazni qancha Pulga almashtira olishini belgilang</p>
+
+                <form action="/settings/exchange_rate" method="POST" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-purple-200 mb-2 uppercase">1 Almaz = ... Pul</label>
+                        <input type="number" name="rate" value="{{ exchange_rate }}" required
+                               class="w-full px-4 py-3 rounded-xl bg-purple-950/60 border border-purple-500/30 text-white font-bold text-center text-lg">
+                    </div>
+                    <button type="submit" class="w-full py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-sm rounded-xl transition">
+                        Kursni Saqlash 💾
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- 5. Jonli O'yinlar Tabi -->
+        <div id="tab-games" class="space-y-4 hidden">
+            <div class="glass-card p-4 rounded-2xl flex items-center justify-between">
+                <div>
+                    <h3 class="font-bold text-sm text-white">🎮 Jonli Guruh O'yinlari Monitoringi</h3>
+                    <p class="text-xs text-purple-300/70">Ayni paytda faoliyat yuritayotgan o'yin xonalari</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {% for g in active_games %}
+                <div class="glass-card p-5 rounded-2xl border border-emerald-500/30">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="text-xs font-mono text-purple-300">Guruh: <code>{{ g.chat_id }}</code></span>
+                        <span class="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-lg text-[10px] font-bold">
+                            {{ g.state }}
+                        </span>
+                    </div>
+                    <div class="text-xs text-purple-200 space-y-1">
+                        <div>🔄 Raund: <b>#{{ g.round }}</b></div>
+                        <div>👥 O'yinchilar soni: <b>{{ g.players_count }} ta</b></div>
+                        <div>❤️ Tiriklar: <b>{{ g.alive_count }} kishi</b></div>
+                    </div>
+                </div>
+                {% else %}
+                <div class="col-span-3 glass-card p-8 rounded-2xl text-center text-purple-400/60">
+                    Hozirda hech qaysi guruhda faol o'yin yo'q. Guruhda /game buyrug'i yuborilganda bu yerda ko'rinadi.
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- 6. Karta To'lovlari Tabi -->
+        <div id="tab-cards" class="hidden space-y-6">
+
+            <!-- Card Settings Card -->
+            <div class="glass-card p-6 rounded-2xl border border-purple-500/20">
+                <h3 class="font-bold text-sm text-white mb-2 flex items-center gap-2">
+                    💳 Qabul Qiluvchi Karta Ma'lumotlari
+                </h3>
+                <p class="text-xs text-purple-300/70 mb-4">
+                    Foydalanuvchilar to'lov qilganda bot ushbu karta raqamini va egasini ko'rsatadi (0% komissiya, to'g'ridan-to'g'ri o'zingizga tushadi).
+                </p>
+
+                <form action="/admin/card_settings/update" method="POST" class="grid grid-cols-1 sm:grid-cols-4 gap-4 items-end">
+                    <div>
+                        <label class="block text-xs text-purple-300 mb-1">Karta Raqami</label>
+                        <input type="text" name="card_number" value="{{ card_info.card_number }}" required
+                               class="w-full px-3 py-2 rounded-xl bg-purple-950/60 border border-purple-500/30 text-white text-xs font-mono">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-purple-300 mb-1">Karta Egasi</label>
+                        <input type="text" name="card_holder" value="{{ card_info.card_holder }}" required
+                               class="w-full px-3 py-2 rounded-xl bg-purple-950/60 border border-purple-500/30 text-white text-xs">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-purple-300 mb-1">Bank Nomi</label>
+                        <input type="text" name="card_bank" value="{{ card_info.card_bank }}" required
+                               class="w-full px-3 py-2 rounded-xl bg-purple-950/60 border border-purple-500/30 text-white text-xs">
+                    </div>
+                    <div>
+                        <button type="submit" class="w-full py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-xl text-xs font-bold transition">
+                            Saqlash 💾
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Card Packages Management (10 Almaz = 1000 so'm...) -->
+            <div class="glass-card p-6 rounded-2xl border border-purple-500/20">
+                <h3 class="font-bold text-sm text-white mb-2 flex items-center gap-2">
+                    📦 So'm Paketlari & Narxlar (10 tasi 1,000 so'm...)
+                </h3>
+                <p class="text-xs text-purple-300/70 mb-4">
+                    Har bir paketning so'mdagi narxi, beriladigan Almaz/Pul miqdori va bonuslarini tahrirlang.
+                </p>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {% for cp in card_pkgs %}
+                    <form action="/admin/card_package/update" method="POST" class="bg-purple-950/40 p-4 rounded-xl border border-purple-500/20 space-y-3">
+                        <input type="hidden" name="pkg_id" value="{{ cp.id }}">
+                        <div class="flex items-center justify-between">
+                            <span class="font-bold text-xs text-white">{{ cp.title }}</span>
+                            <span class="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-purple-500/20 text-purple-300">{{ cp.package_type }}</span>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-[10px] text-purple-300/70">Narxi (so'm)</label>
+                                <input type="number" name="price_uzs" value="{{ cp.price_uzs }}" required class="w-full px-2 py-1 rounded bg-purple-900/50 border border-purple-500/30 text-xs text-white">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] text-purple-300/70">Asosiy miqdor</label>
+                                <input type="number" name="amount" value="{{ cp.amount }}" required class="w-full px-2 py-1 rounded bg-purple-900/50 border border-purple-500/30 text-xs text-white">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-[10px] text-purple-300/70">Bonus miqdor</label>
+                                <input type="number" name="bonus" value="{{ cp.bonus }}" required class="w-full px-2 py-1 rounded bg-purple-900/50 border border-purple-500/30 text-xs text-white">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] text-purple-300/70">Holati</label>
+                                <select name="is_active" class="w-full px-2 py-1 rounded bg-purple-900/50 border border-purple-500/30 text-xs text-white">
+                                    <option value="1" {% if cp.is_active %}selected{% endif %}>Faol</option>
+                                    <option value="0" {% if not cp.is_active %}selected{% endif %}>O'chiq</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="w-full py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded text-xs font-semibold">
+                            Yangilash 🔄
+                        </button>
+                    </form>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Card Transactions Table -->
+            <div class="glass-card rounded-2xl overflow-hidden border border-purple-500/20">
+                <div class="p-4 bg-purple-950/40 border-b border-purple-500/20 flex items-center justify-between">
+                    <div>
+                        <h3 class="font-bold text-sm text-white">📑 Karta To'lovlari Tarixi (Oxirgi 50 ta)</h3>
+                        <p class="text-xs text-purple-300/60">Foydalanuvchilar yuborgan cheklar va to'lovlar holati</p>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-purple-950/60 text-purple-300 uppercase tracking-wider text-[11px] border-b border-purple-500/20">
+                            <tr>
+                                <th class="py-3 px-4">TX ID</th>
+                                <th class="py-3 px-4">Foydalanuvchi</th>
+                                <th class="py-3 px-4">Xarid</th>
+                                <th class="py-3 px-4">Kutilgan Summa</th>
+                                <th class="py-3 px-4">Vaqti</th>
+                                <th class="py-3 px-4">Holat</th>
+                                <th class="py-3 px-4 text-right">Amallar</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-purple-500/10">
+                            {% for t in card_txs %}
+                            <tr class="hover:bg-purple-900/20 transition">
+                                <td class="py-3 px-4 font-mono font-bold text-purple-300">#{{ t.tx_id }}</td>
+                                <td class="py-3 px-4">
+                                    <div class="font-semibold text-white">{{ t.full_name or 'Noma\'lum' }}</div>
+                                    <div class="text-[10px] text-purple-400/60">ID: {{ t.user_id }}</div>
+                                </td>
+                                <td class="py-3 px-4 font-bold text-amber-300">
+                                    {{ t.item_amount }} {{ t.item_type | upper }}
+                                </td>
+                                <td class="py-3 px-4 font-bold text-emerald-400 font-mono">
+                                    {{ "{:,}".format(t.unique_amount) }} so'm
+                                </td>
+                                <td class="py-3 px-4 text-purple-300/60 text-[10px]">
+                                    {{ t.created_at }}
+                                </td>
+                                <td class="py-3 px-4">
+                                    {% if t.status == 'completed' %}
+                                    <span class="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full text-[10px] font-bold">
+                                        Tasdiqlangan ✅
+                                    </span>
+                                    {% elif t.status == 'cancelled' %}
+                                    <span class="bg-red-500/20 text-red-300 border border-red-500/30 px-2 py-0.5 rounded-full text-[10px] font-bold">
+                                        Bekor qilingan ❌
+                                    </span>
+                                    {% else %}
+                                    <span class="bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full text-[10px] font-bold animate-pulse">
+                                        Kutilmoqda ⏳
+                                    </span>
+                                    {% endif %}
+                                </td>
+                                <td class="py-3 px-4 text-right">
+                                    {% if t.status == 'pending' %}
+                                    <div class="flex items-center justify-end gap-1.5">
+                                        <form action="/admin/card_transaction/approve" method="POST" class="inline">
+                                            <input type="hidden" name="tx_id" value="{{ t.tx_id }}">
+                                            <button type="submit" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-[11px] font-bold">
+                                                ✅ Berish
+                                            </button>
+                                        </form>
+                                        <form action="/admin/card_transaction/cancel" method="POST" class="inline">
+                                            <input type="hidden" name="tx_id" value="{{ t.tx_id }}">
+                                            <button type="submit" class="px-2.5 py-1 bg-red-600/80 hover:bg-red-600 text-white rounded text-[11px] font-semibold">
+                                                ❌ Rad
+                                            </button>
+                                        </form>
+                                    </div>
+                                    {% else %}
+                                    <span class="text-purple-400/40 text-[10px]">Yakunlangan</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="7" class="py-6 text-center text-purple-400/50">Hozircha hech qanday karta to'lovlari yo'q.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- SofPay Official Integration Box -->
+            <div class="glass-card p-6 rounded-2xl border border-emerald-500/30 bg-emerald-950/20 space-y-3">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <span class="text-xl">⚡️</span>
+                        <h3 class="font-bold text-sm text-white">SofPay Rasmiy Integratsiyasi (100% Avtomatik)</h3>
+                    </div>
+                    <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                        FAOL & ULANGAN ✅
+                    </span>
+                </div>
+                <p class="text-xs text-purple-300/80">
+                    O'yinchilar botdan paket tanlaganda to'lov to'g'ridan-to'g'ri SofPay tizimi orqali ochiladi.
+                    Telefoningizda SMS yoki Push kelmasa ham, to'lov SofPay serverlari orqali avtomatik tasdiqlanadi!
+                </p>
+                <div class="bg-black/60 p-3 rounded-xl font-mono text-[11px] text-emerald-400 space-y-1">
+                    <div>🔑 <b>Shop Key:</b> <code class="text-white">sk_5b96eeeb...e06f22b</code> (Do'kon: Aiobuna)</div>
+                    <div>🌐 <b>SofPay Webhook Manzili:</b> <code class="text-amber-300">/api/v1/sofpay/webhook</code></div>
+                    <div>🔄 <b>Real-time Polling:</b> O'yinchi botda "To'lovni tekshirish" tugmasini bosganda ham SofPay API orqali jonli tekshiriladi!</div>
+                </div>
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- Modal for Balance Edit -->
+    <div id="balanceModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="glass-card w-full max-w-sm p-6 rounded-3xl border border-purple-500/40">
+            <h3 class="font-bold text-base text-white mb-1">Balansni Tahrirlash</h3>
+            <p id="modalUserName" class="text-xs text-purple-300/70 mb-4"></p>
+
+            <form action="/user/update_balance" method="POST" class="space-y-4">
+                <input type="hidden" id="modalUserId" name="user_id">
+
+                <div>
+                    <label class="block text-xs text-purple-300 mb-1">Pul 💰</label>
+                    <input type="number" id="modalPul" name="pul" required
+                           class="w-full px-3 py-2 rounded-xl bg-purple-950/60 border border-purple-500/30 text-white text-xs">
+                </div>
+
+                <div>
+                    <label class="block text-xs text-purple-300 mb-1">Almaz 💎</label>
+                    <input type="number" id="modalAlmaz" name="almaz" required
+                           class="w-full px-3 py-2 rounded-xl bg-purple-950/60 border border-purple-500/30 text-white text-xs">
+                </div>
+
+                <div class="flex items-center gap-2 pt-2">
+                    <button type="button" onclick="closeBalanceModal()" class="w-1/2 py-2 bg-purple-950 border border-purple-500/30 text-purple-300 rounded-xl text-xs font-semibold">
+                        Bekor qilish
+                    </button>
+                    <button type="submit" class="w-1/2 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-bold">
+                        Saqlash 💾
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function switchTab(tabName) {
+            const tabs = ['users', 'stars', 'shop', 'exchange', 'games', 'cards'];
+            tabs.forEach(t => {
+                const el = document.getElementById('tab-' + t);
+                const btn = document.getElementById('tab-' + t + '-btn');
+                if (el && btn) {
+                    if (t === tabName) {
+                        el.classList.remove('hidden');
+                        btn.classList.add('active');
+                    } else {
+                        el.classList.add('hidden');
+                        btn.classList.remove('active');
+                    }
+                }
+            });
+        }
+
+        // Auto switch tab if ?tab= is in URL
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('tab')) {
+            switchTab(urlParams.get('tab'));
+        }
+
+        function openBalanceModal(userId, userName, pul, almaz) {
+            document.getElementById('modalUserId').value = userId;
+            document.getElementById('modalUserName').innerText = userName + ' (ID: ' + userId + ')';
+            document.getElementById('modalPul').value = pul;
+            document.getElementById('modalAlmaz').value = almaz;
+            document.getElementById('balanceModal').classList.remove('hidden');
+        }
+
+        function closeBalanceModal() {
+            document.getElementById('balanceModal').classList.add('hidden');
+        }
+    </script>
+</body>
+</html>
+

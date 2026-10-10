@@ -1,0 +1,137 @@
+from aiogram.types import (
+    ReplyKeyboardMarkup,
+    KeyboardButton,
+    InlineKeyboardMarkup,
+    InlineKeyboardButton
+)
+from typing import List, Dict, Any
+
+def get_main_keyboard(is_admin: bool = False) -> ReplyKeyboardMarkup:
+    kb = [
+        [KeyboardButton(text="👤 Profil & Balans"), KeyboardButton(text="🛍️ Do'kon & Narsalar")],
+        [KeyboardButton(text="💳 Karta orqali xarid (Uzcard/Humo)"), KeyboardButton(text="⭐️ Stars orqali to'ldirish")],
+        [KeyboardButton(text="🏰 Mafia Klani"), KeyboardButton(text="🎯 Kunlik Missiyalar")],
+        [KeyboardButton(text="🎁 Kunlik bonus"), KeyboardButton(text="🏆 Reyting & Top")],
+        [KeyboardButton(text="📖 O'yin qoidalari & Rollar"), KeyboardButton(text="🤝 Do'stlarni taklif qilish")]
+    ]
+    if is_admin:
+        kb.append([KeyboardButton(text="⚙️ Admin Panel")])
+
+    return ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True)
+
+def get_profile_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="🎒 Inventarim", callback_data="my_inventory"),
+            InlineKeyboardButton(text="🛍️ Do'konga o'tish", callback_data="open_shop")
+        ],
+        [
+            InlineKeyboardButton(text="💳 Karta orqali xarid (So'm)", callback_data="buy_card_menu"),
+            InlineKeyboardButton(text="⭐️ Stars xarid", callback_data="buy_stars_menu")
+        ]
+    ])
+
+def get_shop_menu_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="💰 Pulga sotib olish", callback_data="shop_view_pul"),
+            InlineKeyboardButton(text="💎 Almazga sotib olish", callback_data="shop_view_almaz")
+        ],
+        [
+            InlineKeyboardButton(text="🔄 Almazni Pulga almashtirish", callback_data="shop_exchange"),
+            InlineKeyboardButton(text="🎒 Mening inventarim", callback_data="my_inventory")
+        ]
+    ])
+
+def get_star_packages_keyboard(packages: List[Dict[str, Any]], pkg_type: str = "almaz") -> InlineKeyboardMarkup:
+    buttons = []
+    for pkg in packages:
+        text = f"{pkg['title']} — ⭐️ {pkg['stars_price']}"
+        buttons.append([InlineKeyboardButton(text=text, callback_data=f"buy_pkg_{pkg['id']}")])
+
+    toggle_btn = (
+        InlineKeyboardButton(text="💰 Pul paketlariga o'tish", callback_data="stars_type_pul")
+        if pkg_type == "almaz" else
+        InlineKeyboardButton(text="💎 Almaz paketlariga o'tish", callback_data="stars_type_almaz")
+    )
+    buttons.append([toggle_btn])
+    buttons.append([InlineKeyboardButton(text="🔙 Asosiy menyu", callback_data="back_to_main")])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+def get_card_packages_keyboard(packages: List[Dict[str, Any]], pkg_type: str = "almaz") -> InlineKeyboardMarkup:
+    buttons = []
+    filtered = [p for p in packages if p["package_type"] == pkg_type]
+    for pkg in filtered:
+        text = f"{pkg['title']} — {pkg['price_uzs']:,} so'm"
+        buttons.append([InlineKeyboardButton(text=text, callback_data=f"buy_card_pkg_{pkg['id']}")])
+
+    type_switch = []
+    if pkg_type != "almaz":
+        type_switch.append(InlineKeyboardButton(text="💎 Almazlar", callback_data="card_view_almaz"))
+    if pkg_type != "pul":
+        type_switch.append(InlineKeyboardButton(text="💰 Pullar", callback_data="card_view_pul"))
+    if pkg_type != "vip":
+        type_switch.append(InlineKeyboardButton(text="👑 VIP", callback_data="card_view_vip"))
+    if type_switch:
+        buttons.append(type_switch)
+
+    buttons.append([InlineKeyboardButton(text="🔙 Asosiy menyu", callback_data="back_to_main")])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+def get_card_invoice_keyboard(tx_id: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="🔄 To'lovni tekshirish", callback_data=f"check_card_tx_{tx_id}")
+        ],
+        [
+            InlineKeyboardButton(text="❌ Bekor qilish", callback_data=f"cancel_card_tx_{tx_id}")
+        ]
+    ])
+
+def get_admin_card_confirm_keyboard(tx_id: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="✅ Tasdiqlash (Berilsin)", callback_data=f"adm_appr_tx_{tx_id}"),
+            InlineKeyboardButton(text="❌ Rad etish", callback_data=f"adm_rejc_tx_{tx_id}")
+        ]
+    ])
+
+def get_lobby_keyboard(chat_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="👱‍♂️ Qo'shilish", callback_data=f"join_{chat_id}"),
+            InlineKeyboardButton(text="🚪 Chiqish", callback_data=f"leave_{chat_id}")
+        ],
+        [
+            InlineKeyboardButton(text="🤖 Bot qo'shish", callback_data=f"addbot_{chat_id}"),
+            InlineKeyboardButton(text="🚀 O'yinni boshlash (Admin)", callback_data=f"forcestart_{chat_id}")
+        ]
+    ])
+
+def get_group_redirect_keyboard(group_url: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="Перейти в группу", url=group_url)
+        ]
+    ])
+
+
+def get_admin_main_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="📊 Statistika", callback_data="adm_stats"),
+            InlineKeyboardButton(text="👤 Foydalanuvchini boshqarish", callback_data="adm_users")
+        ],
+        [
+            InlineKeyboardButton(text="💰 Balans berish / olish", callback_data="adm_balance"),
+            InlineKeyboardButton(text="🚫 Ban / Unban", callback_data="adm_ban")
+        ],
+        [
+            InlineKeyboardButton(text="⭐️ Stars narxlarini o'zgartirish", callback_data="adm_stars_edit"),
+            InlineKeyboardButton(text="🛍️ Do'kon narxlarini o'zgartirish", callback_data="adm_shop_edit")
+        ],
+        [
+            InlineKeyboardButton(text="📢 Xabar tarqatish (Broadcast)", callback_data="adm_broadcast"),
+            InlineKeyboardButton(text="🌐 Web Panel havolasi", callback_data="adm_weblink")
+        ]
+    ])
