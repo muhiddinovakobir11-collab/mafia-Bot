@@ -11,12 +11,22 @@ from config import MIN_PLAYERS, ADMIN_IDS
 router = Router()
 
 def format_lobby_text(room) -> str:
-    player_names = ", ".join([p.tag for p in room.players.values()]) if room.players else "Hozircha hech kim yo'q"
+    import html
+    if room.players:
+        player_links = []
+        for p in room.players.values():
+            safe_name = html.escape(p.full_name)
+            link = f'<a href="tg://user?id={p.user_id}">{safe_name}</a>'
+            player_links.append(link)
+        players_text = " , ".join(player_links)
+    else:
+        players_text = "Hozircha hech kim yo'q"
+
     return (
-        f"📌 <b>Ro'yxatdan o'tish davom etmoqda!</b>\n\n"
-        f"👥 <b>Ro'yxatdan o'tganlar:</b>\n{player_names}\n\n"
-        f"📊 <b>Jami:</b> {len(room.players)} kishi.\n\n"
-        f"<i>Kamida {MIN_PLAYERS} kishi to'plangach, guruh admini yoki o'yin yaratuvchisi '🚀 O'yinni boshlash' tugmasini bosib start qilishi mumkin.</i>"
+        f"<b>Ro'yxatdan o'tish davom etmoqda!</b>\n"
+        f"Ro'yxatdan o'tganlar:\n\n"
+        f"{players_text}\n\n"
+        f"Jami: <b>{len(room.players)} ta</b>"
     )
 
 async def check_admin_permission(bot, chat_id: int, user_id: int, creator_id: int) -> bool:
@@ -32,6 +42,10 @@ async def check_admin_permission(bot, chat_id: int, user_id: int, creator_id: in
 
 @router.message(Command("game"))
 @router.message(Command("mafia"))
+@router.message(Command("startgame"))
+@router.message(Command("go"))
+@router.message(Command("boshlash"))
+@router.message(Command("play"))
 async def start_game_cmd(message: Message):
     if message.chat.type == "private":
         bot_info = await message.bot.get_me()
@@ -55,8 +69,23 @@ async def start_game_cmd(message: Message):
             await message.answer("⚠️ <b>Guruhda ayni paytda o'yin davom etmoqda!</b>\nO'yin tugashini kuting.")
             return
         else:
-            await message.answer("⚠️ <b>O'yinga qabul allaqachon boshlangan!</b> Tepada qadalgan (pinned) xabarga qarang.")
-            return
+            can_start = await check_admin_permission(message.bot, chat_id, message.from_user.id, existing_room.creator_id)
+            if can_start:
+                if len(existing_room.players) >= MIN_PLAYERS:
+                    if existing_room.lobby_task and not existing_room.lobby_task.done():
+                        existing_room.lobby_task.cancel()
+                    await message.answer("🚀 <b>O'yin boshlanmoqda...</b>")
+                    await existing_room.start_game()
+                    return
+                else:
+                    await message.answer(
+                        f"⚠️ <b>O'yinni boshlash uchun kamida {MIN_PLAYERS} kishi kerak!</b>\n"
+                        f"Hozirda {len(existing_room.players)} ta o'yinchi bor. Qo'shilish uchun <b>'🤵 Qo'shilish'</b> tugmasini bosing yoki <b>/bot</b> yozing."
+                    )
+                    return
+            else:
+                await message.answer("⚠️ <b>O'yinga qabul allaqachon boshlangan!</b> Tepada qadalgan xabardagi <b>'🤵 Qo'shilish'</b> tugmasini bosing.")
+                return
 
     # Check if user is banned
     user = await db.get_or_create_user(message.from_user.id, message.from_user.username or "", message.from_user.full_name or "")
@@ -341,6 +370,7 @@ async def handle_add_bot(call: CallbackQuery):
         pass
 
 @router.message(Command("addbot"))
+@router.message(Command("bot"))
 async def handle_addbot_cmd(message: Message):
     if message.chat.type == "private":
         return
@@ -350,7 +380,29 @@ async def handle_addbot_cmd(message: Message):
         return
     bot_player = room.add_ai_bot()
     if bot_player:
-        await message.answer(f"🤖 <b>{bot_player.full_name}</b> o'yinga qo'shildi!")
+        try:
+            if room.lobby_message_id:
+                await room.bot.edit_message_text(
+                    format_lobby_text(room),
+                    chat_id=message.chat.id,
+                    message_id=room.lobby_message_id,
+                    reply_markup=get_lobby_keyboard(message.chat.id),
+                    parse_mode="HTML"
+                )
+        except Exception:
+            pass
+
+@router.message(Command("leave"))
+@router.message(Command("chiqish"))
+async def handle_leave_cmd(message: Message):
+    if message.chat.type == "private":
+        return
+    room = game_manager.get_room(message.chat.id)
+    if not room or room.state != "LOBBY":
+        return
+    removed = room.remove_player(message.from_user.id)
+    if removed:
+        await message.reply("🚪 Siz o'yindan chiqdingiz.")
         try:
             if room.lobby_message_id:
                 await room.bot.edit_message_text(
