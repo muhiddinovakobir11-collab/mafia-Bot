@@ -91,7 +91,7 @@ async def cmd_start(message: Message):
     )
     await message.answer(welcome_text, parse_mode="HTML", reply_markup=get_main_keyboard(is_admin))
 
-@router.message(F.text == "👤 Profil & Balans")
+@router.message(F.text.contains("Profil & Balans"))
 @router.message(Command("profile"))
 async def show_profile(message: Message):
     user = await db.get_or_create_user(
@@ -150,7 +150,7 @@ async def show_inventory_cb(call: CallbackQuery):
     await call.message.answer(txt, parse_mode="HTML")
     await call.answer()
 
-@router.message(F.text == "🎁 Kunlik bonus")
+@router.message(F.text.contains("Kunlik bonus"))
 @router.message(Command("bonus"))
 async def daily_bonus(message: Message):
     user = await db.get_or_create_user(message.from_user.id)
@@ -185,7 +185,7 @@ async def daily_bonus(message: Message):
         f"<i>Ertaga yana kiring va yangi sovg'alarga ega bo'ling!</i>"
     )
 
-@router.message(F.text == "🏆 Reyting & Top")
+@router.message(F.text.contains("Reyting & Top"))
 @router.message(Command("top"))
 async def show_leaderboard(message: Message):
     top_winners = await db.get_leaderboard("games_won", 10)
@@ -204,7 +204,7 @@ async def show_leaderboard(message: Message):
     text += "\n<i>Har hafta eng yaxshi o'yinchilarga qimmatbaho almaz sovg'alari beriladi!</i>"
     await message.answer(text, parse_mode="HTML")
 
-@router.message(F.text == "🤝 Do'stlarni taklif qilish")
+@router.message(F.text.contains("Do'stlarni taklif"))
 @router.message(Command("ref"))
 async def referral_link(message: Message):
     bot_info = await message.bot.get_me()
@@ -220,7 +220,7 @@ async def referral_link(message: Message):
     )
     await message.answer(text, parse_mode="HTML")
 
-@router.message(F.text == "📖 O'yin qoidalari & Rollar")
+@router.message(F.text.contains("O'yin qoidalari"))
 @router.message(Command("roles"))
 async def game_roles_help(message: Message):
     text = "📖 <b>O'YINNING BARCHA AKTIV ROLLARI VA QOIDALARI:</b>\n\n"

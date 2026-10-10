@@ -10,7 +10,8 @@ from bot.keyboards import get_star_packages_keyboard
 
 router = Router()
 
-@router.message(F.text == "⭐️ Stars orqali to'ldirish")
+@router.message(F.text.contains("Stars to'ldirish"))
+@router.message(F.text.contains("Stars orqali"))
 @router.callback_query(F.data == "buy_stars_menu")
 @router.callback_query(F.data == "stars_type_almaz")
 async def show_stars_almaz_menu(event: Message | CallbackQuery):

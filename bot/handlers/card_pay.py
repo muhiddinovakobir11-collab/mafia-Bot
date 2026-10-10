@@ -15,7 +15,7 @@ from bot.keyboards import (
 
 router = Router()
 
-@router.message(F.text == "💳 Karta orqali xarid (Uzcard/Humo)")
+@router.message(F.text.contains("Karta orqali xarid"))
 @router.message(Command("pay"))
 async def show_card_pay_menu(message: Message):
     packages = await db.get_card_packages(only_active=True)

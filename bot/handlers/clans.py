@@ -13,7 +13,7 @@ class ClanFSM(StatesGroup):
     waiting_for_clan_tag = State()
     waiting_for_deposit_amount = State()
 
-@router.message(F.text == "🏰 Mafia Klani")
+@router.message(F.text.contains("Mafia Klani"))
 @router.message(Command("clan"))
 async def show_clan_menu(message: Message):
     user_id = message.from_user.id

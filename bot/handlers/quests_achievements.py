@@ -13,7 +13,7 @@ class WillFSM(StatesGroup):
 
 # --- 1. DAILY QUESTS ---
 
-@router.message(F.text == "🎯 Kunlik Missiyalar")
+@router.message(F.text.contains("Kunlik Missiyalar"))
 @router.message(Command("quests"))
 async def show_daily_quests(message: Message):
     user_id = message.from_user.id

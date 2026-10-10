@@ -26,7 +26,7 @@ def is_admin(user_id: int) -> bool:
 
 # --- MAIN ADMIN MENU ---
 
-@router.message(F.text == "⚙️ Admin Panel")
+@router.message(F.text.contains("Admin Panel"))
 @router.message(Command("admin"))
 async def open_admin_panel(message: Message, state: FSMContext):
     if not is_admin(message.from_user.id):

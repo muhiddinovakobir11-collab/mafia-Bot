@@ -7,7 +7,7 @@ from bot.keyboards import get_shop_menu_keyboard
 
 router = Router()
 
-@router.message(F.text == "🛍️ Do'kon & Narsalar")
+@router.message(F.text.contains("Do'kon & Narsalar"))
 @router.callback_query(F.data == "open_shop")
 async def show_shop_menu(event: Message | CallbackQuery):
     text = (

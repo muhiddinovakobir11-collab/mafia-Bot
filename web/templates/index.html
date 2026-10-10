@@ -22,6 +22,91 @@
             color: #ffffff;
             box-shadow: 0 4px 20px rgba(124, 58, 237, 0.4);
         }
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            border-radius: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            border: 1px solid transparent;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+        }
+        .btn:hover {
+            transform: translateY(-1px);
+        }
+        .btn:active {
+            transform: translateY(0);
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #4f46e5, #2563eb);
+            color: #ffffff;
+            border-color: rgba(99, 102, 241, 0.5);
+            box-shadow: 0 4px 15px rgba(79, 70, 229, 0.35);
+        }
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #4338ca, #1d4ed8);
+            box-shadow: 0 6px 20px rgba(79, 70, 229, 0.55);
+        }
+        .btn-success {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: #ffffff;
+            border-color: rgba(16, 185, 129, 0.5);
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.35);
+        }
+        .btn-success:hover {
+            background: linear-gradient(135deg, #059669, #047857);
+            box-shadow: 0 6px 20px rgba(16, 185, 129, 0.55);
+        }
+        .btn-danger {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            color: #ffffff;
+            border-color: rgba(239, 68, 68, 0.5);
+            box-shadow: 0 4px 15px rgba(239, 68, 68, 0.35);
+        }
+        .btn-danger:hover {
+            background: linear-gradient(135deg, #dc2626, #b91c1c);
+            box-shadow: 0 6px 20px rgba(239, 68, 68, 0.55);
+        }
+        .btn-warning {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            color: #ffffff;
+            border-color: rgba(245, 158, 11, 0.5);
+            box-shadow: 0 4px 15px rgba(245, 158, 11, 0.35);
+        }
+        .btn-warning:hover {
+            background: linear-gradient(135deg, #d97706, #b45309);
+            box-shadow: 0 6px 20px rgba(245, 158, 11, 0.55);
+        }
+        .btn-info {
+            background: linear-gradient(135deg, #06b6d4, #0284c7);
+            color: #ffffff;
+            border-color: rgba(6, 182, 212, 0.5);
+            box-shadow: 0 4px 15px rgba(6, 182, 212, 0.35);
+        }
+        .btn-info:hover {
+            background: linear-gradient(135deg, #0891b2, #0369a1);
+            box-shadow: 0 6px 20px rgba(6, 182, 212, 0.55);
+        }
+        .btn-purple {
+            background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+            color: #ffffff;
+            border-color: rgba(139, 92, 246, 0.5);
+            box-shadow: 0 4px 15px rgba(139, 92, 246, 0.35);
+        }
+        .btn-purple:hover {
+            background: linear-gradient(135deg, #7c3aed, #6d28d9);
+            box-shadow: 0 6px 20px rgba(139, 92, 246, 0.55);
+        }
+        .btn-secondary {
+            background: rgba(51, 65, 85, 0.6);
+            color: #e2e8f0;
+            border-color: rgba(148, 163, 184, 0.3);
+        }
+        .btn-secondary:hover {
+            background: rgba(71, 85, 105, 0.8);
+        }
     </style>
 </head>
 <body class="min-h-screen flex flex-col">
@@ -46,7 +131,7 @@
                 <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
                 <span class="text-purple-200">Server Holati: Faol</span>
             </div>
-            <a href="/logout" class="text-xs bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-500/30 px-3.5 py-1.5 rounded-xl transition font-semibold">
+            <a href="/logout" class="btn btn-danger text-xs px-3.5 py-1.5 rounded-xl">
                 Chiqish 🚪
             </a>
         </div>
@@ -121,8 +206,8 @@
                 <form method="GET" action="/" class="w-full sm:w-80 flex items-center gap-2">
                     <input type="text" name="q" value="{{ search_query }}" placeholder="ID, Username yoki ism bo'yicha qidiruv..."
                            class="w-full px-3.5 py-2 rounded-xl bg-purple-950/60 border border-purple-500/30 text-xs text-white placeholder-purple-400/40 focus:outline-none focus:border-purple-400">
-                    <button type="submit" class="px-4 py-2 bg-purple-600 hover:bg-purple-500 rounded-xl text-xs font-bold transition">
-                        Qidirish
+                    <button type="submit" class="btn btn-primary px-4 py-2 rounded-xl text-xs">
+                        🔍 Qidirish
                     </button>
                 </form>
                 <div class="text-xs text-purple-300/70">
@@ -180,15 +265,15 @@
                                 </td>
                                 <td class="py-3 px-4 text-right space-x-2">
                                     <button onclick="openBalanceModal({{ u.id }}, '{{ u.full_name | escape }}', {{ u.pul }}, {{ u.almaz }})"
-                                            class="px-2.5 py-1 bg-purple-600/30 hover:bg-purple-600/50 border border-purple-500/40 text-purple-200 rounded-lg transition font-semibold">
+                                            class="btn btn-info px-2.5 py-1 rounded-lg text-xs font-semibold">
                                         ✏️ Balans
                                     </button>
                                     <form action="/user/toggle_ban" method="POST" class="inline">
                                         <input type="hidden" name="user_id" value="{{ u.id }}">
                                         <input type="hidden" name="ban_status" value="{{ 0 if u.is_banned else 1 }}">
                                         <button type="submit"
-                                                class="px-2.5 py-1 {{ 'bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 border-emerald-500/40' if u.is_banned else 'bg-red-500/20 text-red-300 hover:bg-red-500/30 border-red-500/40' }} border rounded-lg transition font-semibold">
-                                            {{ 'Unban' if u.is_banned else 'Ban' }}
+                                                class="btn {{ 'btn-success' if u.is_banned else 'btn-danger' }} px-2.5 py-1 rounded-lg text-xs font-semibold">
+                                            {{ '✅ Unban' if u.is_banned else '🚫 Ban' }}
                                         </button>
                                     </form>
                                 </td>
@@ -253,7 +338,7 @@
                             </select>
                         </div>
 
-                        <button type="submit" class="w-full py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-bold transition">
+                        <button type="submit" class="btn btn-success w-full py-2 rounded-xl text-xs">
                             Saqlash 💾
                         </button>
                     </form>
@@ -313,7 +398,7 @@
                             </select>
                         </div>
 
-                        <button type="submit" class="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition">
+                        <button type="submit" class="btn btn-primary w-full py-2 rounded-xl text-xs">
                             Yangilash 💾
                         </button>
                     </form>
@@ -335,7 +420,7 @@
                         <input type="number" name="rate" value="{{ exchange_rate }}" required
                                class="w-full px-4 py-3 rounded-xl bg-purple-950/60 border border-purple-500/30 text-white font-bold text-center text-lg">
                     </div>
-                    <button type="submit" class="w-full py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-sm rounded-xl transition">
+                    <button type="submit" class="btn btn-warning w-full py-2.5 rounded-xl text-sm font-bold">
                         Kursni Saqlash 💾
                     </button>
                 </form>
@@ -403,7 +488,7 @@
                                class="w-full px-3 py-2 rounded-xl bg-purple-950/60 border border-purple-500/30 text-white text-xs">
                     </div>
                     <div>
-                        <button type="submit" class="w-full py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-xl text-xs font-bold transition">
+                        <button type="submit" class="btn btn-primary w-full py-2 rounded-xl text-xs">
                             Saqlash 💾
                         </button>
                     </div>
@@ -453,7 +538,7 @@
                             </div>
                         </div>
 
-                        <button type="submit" class="w-full py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded text-xs font-semibold">
+                        <button type="submit" class="btn btn-purple w-full py-1.5 rounded-xl text-xs">
                             Yangilash 🔄
                         </button>
                     </form>
@@ -520,13 +605,13 @@
                                     <div class="flex items-center justify-end gap-1.5">
                                         <form action="/admin/card_transaction/approve" method="POST" class="inline">
                                             <input type="hidden" name="tx_id" value="{{ t.tx_id }}">
-                                            <button type="submit" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-[11px] font-bold">
+                                            <button type="submit" class="btn btn-success px-2.5 py-1 rounded-lg text-[11px]">
                                                 ✅ Berish
                                             </button>
                                         </form>
                                         <form action="/admin/card_transaction/cancel" method="POST" class="inline">
                                             <input type="hidden" name="tx_id" value="{{ t.tx_id }}">
-                                            <button type="submit" class="px-2.5 py-1 bg-red-600/80 hover:bg-red-600 text-white rounded text-[11px] font-semibold">
+                                            <button type="submit" class="btn btn-danger px-2.5 py-1 rounded-lg text-[11px]">
                                                 ❌ Rad
                                             </button>
                                         </form>
@@ -594,10 +679,10 @@
                 </div>
 
                 <div class="flex items-center gap-2 pt-2">
-                    <button type="button" onclick="closeBalanceModal()" class="w-1/2 py-2 bg-purple-950 border border-purple-500/30 text-purple-300 rounded-xl text-xs font-semibold">
+                    <button type="button" onclick="closeBalanceModal()" class="btn btn-secondary w-1/2 py-2 rounded-xl text-xs">
                         Bekor qilish
                     </button>
-                    <button type="submit" class="w-1/2 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-bold">
+                    <button type="submit" class="btn btn-success w-1/2 py-2 rounded-xl text-xs">
                         Saqlash 💾
                     </button>
                 </div>
