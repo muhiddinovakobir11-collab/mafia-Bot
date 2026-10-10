@@ -872,8 +872,12 @@ class GameRoom:
             r = ROLES[p.role_code]
             is_winner = (winner_team and r.team == winner_team)
 
-            base_xp = 150 if is_winner else -4
-            base_pul = 500 if is_winner else 5
+            if is_winner:
+                base_pul = 30 if p.is_alive else 20
+                base_xp = 30 if p.is_alive else 20
+            else:
+                base_pul = 5
+                base_xp = 5
 
             if p.is_bot:
                 card_text = self.format_player_end_game_card(
@@ -975,20 +979,15 @@ class GameRoom:
                 pass
 
         final_msg = (
-            f"🏁 <b>Игра окончена.</b>\n\n"
+            f"🏁 <b>O'yin yakunlandi!</b>\n\n"
             f"{winner_announcement}\n\n"
             f"🏆 <b>G'OLIBLAR (YUTGANLAR):</b>\n"
             f"{winners_text}\n\n"
             f"💀 <b>HALOK BO'LGANLAR VA MAG'LUBLAR:</b>\n"
             f"{losers_text}\n\n"
-            f"🎁 <b>O'yinchilarning shaxsiy natijalari:</b>"
+            f"📩 <i>Har bir o'yinchining shaxsiy hisoboti, pul va darajalari shaxsiy lichkasiga yuborildi!</i>"
         )
         await self.broadcast_group(final_msg)
-
-        # Broadcast each player's end game card to the group chat
-        for uid, card_text in player_cards:
-            await self.broadcast_group(card_text)
-            await asyncio.sleep(0.3)
 
         game_manager.remove_room(self.chat_id)
 

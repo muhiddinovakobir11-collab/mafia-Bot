@@ -3,6 +3,7 @@ from pathlib import Path
 
 # Asosiy bot sozlamalari
 BOT_TOKEN = os.getenv("BOT_TOKEN", "8821320616:AAHTX9PHj4Ky8L5TJElc8oVU3oPmVHQowF8")
+BOT_USERNAME = os.getenv("BOT_USERNAME", "mafioznikiuzbot")
 ADMIN_IDS = [8055412146]
 
 # Baza va fayllar yo'li

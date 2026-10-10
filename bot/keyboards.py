@@ -98,10 +98,13 @@ def get_admin_card_confirm_keyboard(tx_id: str) -> InlineKeyboardMarkup:
         ]
     ])
 
-def get_lobby_keyboard(chat_id: int) -> InlineKeyboardMarkup:
+def get_lobby_keyboard(chat_id: int, bot_username: str = None) -> InlineKeyboardMarkup:
+    from config import BOT_USERNAME
+    b_name = bot_username or BOT_USERNAME
+    join_url = f"https://t.me/{b_name}?start=join_{chat_id}"
     return InlineKeyboardMarkup(inline_keyboard=[
         [
-            InlineKeyboardButton(text="🟢 👱‍♂️ Qo'shilish", callback_data=f"join_{chat_id}"),
+            InlineKeyboardButton(text="🟢 👱‍♂️ Qo'shilish", url=join_url),
             InlineKeyboardButton(text="🔴 🚪 Chiqish", callback_data=f"leave_{chat_id}")
         ],
         [

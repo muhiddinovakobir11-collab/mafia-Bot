@@ -486,9 +486,9 @@ class Database:
         current_level = user["level"]
         current_xp = user["xp"] + xp_amount
 
-        # XP calculation formula: next_level_req = level * 150
+        # XP calculation formula: next_level_req = level * 250
         def xp_for_level(lvl: int) -> int:
-            return lvl * 150
+            return lvl * 250
 
         leveled_up = False
         rewards = []
@@ -498,29 +498,24 @@ class Database:
             current_level += 1
             leveled_up = True
 
-            # Rewards per level
-            # Level 2: 1000 pul
-            # Level 3: 10 almaz + 1500 pul
-            # Level 4: 15 almaz + 2500 pul
-            # Level 5: 30 almaz + 1 Qalqon
+            # Balanced rewards per level
             if current_level == 2:
-                rewards.append({"pul": 1000, "almaz": 0, "item": None, "msg": "1,000 💰 Pul"})
-                await self.update_balance(user_id, pul_diff=1000)
+                rewards.append({"pul": 50, "almaz": 1, "item": None, "msg": "50 💰 Pul va 1 💎 Almaz"})
+                await self.update_balance(user_id, pul_diff=50, almaz_diff=1)
             elif current_level == 3:
-                rewards.append({"pul": 1500, "almaz": 10, "item": None, "msg": "10 💎 Almaz va 1,500 💰 Pul"})
-                await self.update_balance(user_id, pul_diff=1500, almaz_diff=10)
+                rewards.append({"pul": 100, "almaz": 2, "item": None, "msg": "100 💰 Pul va 2 💎 Almaz"})
+                await self.update_balance(user_id, pul_diff=100, almaz_diff=2)
             elif current_level == 4:
-                rewards.append({"pul": 2500, "almaz": 15, "item": None, "msg": "15 💎 Almaz va 2,500 💰 Pul"})
-                await self.update_balance(user_id, pul_diff=2500, almaz_diff=15)
+                rewards.append({"pul": 150, "almaz": 3, "item": None, "msg": "150 💰 Pul va 3 💎 Almaz"})
+                await self.update_balance(user_id, pul_diff=150, almaz_diff=3)
             elif current_level == 5:
-                rewards.append({"pul": 3500, "almaz": 30, "item": "qalqon", "msg": "30 💎 Almaz, 3,500 💰 Pul va 🛡️ Qalqon"})
-                await self.update_balance(user_id, pul_diff=3500, almaz_diff=30)
+                rewards.append({"pul": 250, "almaz": 5, "item": "qalqon", "msg": "250 💰 Pul, 5 💎 Almaz va 🛡️ Qalqon"})
+                await self.update_balance(user_id, pul_diff=250, almaz_diff=5)
                 await self.add_inventory_item(user_id, "qalqon", 1)
             else:
-                # Generic reward for level > 5
-                p = current_level * 750
-                a = current_level * 3
-                rewards.append({"pul": p, "almaz": a, "item": None, "msg": f"{a} 💎 Almaz va {p:,} 💰 Pul"})
+                p = current_level * 40
+                a = max(1, current_level // 2)
+                rewards.append({"pul": p, "almaz": a, "item": None, "msg": f"{a} 💎 Almaz va {p} 💰 Pul"})
                 await self.update_balance(user_id, pul_diff=p, almaz_diff=a)
 
         async with aiosqlite.connect(self.db_path) as db:

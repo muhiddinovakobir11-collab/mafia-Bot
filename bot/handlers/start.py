@@ -20,36 +20,69 @@ async def cmd_start(message: Message):
     args = message.text.split() if message.text else []
     if len(args) > 1 and args[1].startswith("join_"):
         try:
-            target_chat_id = int(args[1].replace("join_", ""))
+            raw_id = args[1].replace("join_", "")
+            target_chat_id = int(raw_id)
             from game.engine import game_manager
             from bot.keyboards import get_lobby_keyboard
             from bot.handlers.group_game import format_lobby_text
+
+            u = await db.get_or_create_user(user_id, username, full_name)
+            if u.get("is_banned"):
+                await message.answer("🚫 <b>Siz botdan bloklangansiz va o'yinda ishtirok eta olmaysiz!</b>")
+                return
+
             room = game_manager.get_room(target_chat_id)
+            if not room and target_chat_id > 0:
+                room = game_manager.get_room(-target_chat_id)
+                if not room:
+                    try:
+                        room = game_manager.get_room(int(f"-100{target_chat_id}"))
+                    except Exception:
+                        pass
+            if not room and target_chat_id < 0:
+                room = game_manager.get_room(abs(target_chat_id))
+
             if room and room.state == "LOBBY":
                 group_url = await room.get_group_link()
                 group_kb = InlineKeyboardMarkup(inline_keyboard=[
-                    [InlineKeyboardButton(text="Перейти в группу", url=group_url)]
+                    [InlineKeyboardButton(text="🔵 Guruhga qaytish ➔", url=group_url)]
                 ])
                 if user_id in room.players:
-                    await message.answer("Вы уже присоединились к этой игре!", reply_markup=group_kb)
+                    await message.answer(
+                        "ℹ️ <b>Siz allaqachon ushbu o'yinga qo'shilgansiz!</b>\n\n"
+                        "O'yin boshlanishini guruhda kuting.",
+                        reply_markup=group_kb,
+                        parse_mode="HTML"
+                    )
                     return
+
                 added = room.add_player(user_id, full_name, username)
                 if added:
-                    await message.answer("Вы успешно присоединились к игре!", reply_markup=group_kb)
+                    await message.answer(
+                        "✅ <b>Muvaffaqiyatli qo'shildingiz!</b>\n\n"
+                        "Siz o'yin ro'yxatiga kiritildingiz. O'yin boshlanganda maxfiy rolingiz shu yerga yuboriladi.\n"
+                        "Guruhga qaytib, o'yin boshlanishini kuting!",
+                        reply_markup=group_kb,
+                        parse_mode="HTML"
+                    )
                     try:
                         if room.lobby_message_id:
                             await room.bot.edit_message_text(
                                 format_lobby_text(room),
-                                chat_id=target_chat_id,
+                                chat_id=room.chat_id,
                                 message_id=room.lobby_message_id,
-                                reply_markup=get_lobby_keyboard(target_chat_id),
+                                reply_markup=get_lobby_keyboard(room.chat_id),
                                 parse_mode="HTML"
                             )
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        print(f"[Edit lobby error]: {e}")
                     return
             else:
-                await message.answer("❌ O'yin mavjud emas yoki allaqachon boshlanib ketgan!")
+                await message.answer(
+                    "⚠️ <b>Bu o'yin allaqachon boshlangan yoki yakunlangan!</b>\n\n"
+                    "Yangi o'yinga qo'shilish uchun guruhda /game yuboring.",
+                    parse_mode="HTML"
+                )
                 return
         except Exception as e:
             print(f"[Deep join error]: {e}")

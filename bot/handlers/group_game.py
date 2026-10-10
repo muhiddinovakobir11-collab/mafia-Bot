@@ -101,16 +101,17 @@ async def handle_join(call: CallbackQuery):
 
     group_url = await room.get_group_link()
     group_kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="Перейти в группу", url=group_url)]
+        [InlineKeyboardButton(text="🔵 Guruhga qaytish ➔", url=group_url)]
     ])
 
     if call.from_user.id in room.players:
-        await call.answer("Вы уже присоединились к этой игре!", show_alert=False)
+        await call.answer("Siz allaqachon bu o'yinga qo'shilgansiz!", show_alert=False)
         try:
             await call.bot.send_message(
                 call.from_user.id,
-                "Вы уже присоединились к этой игре!",
-                reply_markup=group_kb
+                "ℹ️ <b>Siz allaqachon bu o'yinga qo'shilgansiz!</b>\n\nO'yin boshlanishini guruhda kuting.",
+                reply_markup=group_kb,
+                parse_mode="HTML"
             )
         except Exception:
             pass
@@ -118,17 +119,20 @@ async def handle_join(call: CallbackQuery):
 
     added = room.add_player(call.from_user.id, call.from_user.full_name, call.from_user.username or "")
     if not added:
-        await call.answer("Вы уже присоединились к этой игре!", show_alert=False)
+        await call.answer("Siz allaqachon bu o'yinga qo'shilgansiz!", show_alert=False)
         return
 
-    await call.answer("Вы успешно присоединились к игре!")
+    await call.answer("✅ Muvaffaqiyatli qo'shildingiz!")
 
-    # Send DM to user matching TrueMafia with "Перейти в группу" button
+    # Send DM to user matching TrueMafia with "Guruhga qaytish" button
     try:
         await call.bot.send_message(
             call.from_user.id,
-            "Вы успешно присоединились к игре!",
-            reply_markup=group_kb
+            "✅ <b>Muvaffaqiyatli qo'shildingiz!</b>\n\n"
+            "Siz o'yin ro'yxatiga kiritildingiz. O'yin boshlanganda maxfiy rolingiz shu yerga yuboriladi.\n"
+            "Guruhga qaytib, o'yin boshlanishini kuting!",
+            reply_markup=group_kb,
+            parse_mode="HTML"
         )
     except Exception:
         bot_info = await call.bot.get_me()
