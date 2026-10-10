@@ -30,17 +30,29 @@ from web.app import app as web_app
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("MafiaBot")
+import socket
+
+def get_free_port(preferred: int, host: str = "0.0.0.0") -> int:
+    for p in [preferred, 8000, 8088, 8888, 5000]:
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.bind((host, p))
+                return p
+        except Exception:
+            continue
+    return preferred
 
 async def run_web_server():
+    active_port = get_free_port(WEB_PORT, WEB_HOST)
     config = uvicorn.Config(
         app=web_app,
         host=WEB_HOST,
-        port=WEB_PORT,
+        port=active_port,
         log_level="warning",
         access_log=False
     )
     server = uvicorn.Server(config)
-    logger.info(f"🌐 Web Admin Panel ishga tushdi: http://localhost:{WEB_PORT}")
+    logger.info(f"🌐 Web Admin Panel ishga tushdi: http://localhost:{active_port}")
     await server.serve()
 
 async def run_bot():
@@ -68,10 +80,16 @@ async def run_bot():
     await db.init()
     logger.info("✅ Ma'lumotlar bazasi tayyor!")
 
-    # Delete existing webhook if any and start polling
-    await bot.delete_webhook(drop_pending_updates=True)
-    logger.info("🤖 Mafia Telegram boti ishga tushmoqda...")
-    await dp.start_polling(bot)
+    # Delete existing webhook if any and start polling with auto-retry
+    while True:
+        try:
+            await bot.delete_webhook(drop_pending_updates=True)
+            logger.info("🤖 Mafia Telegram boti ishga tushmoqda...")
+            await dp.start_polling(bot)
+            break
+        except Exception as e:
+            logger.warning(f"⚠️ Telegram ulanish xatosi ({e}). 3 soniyadan so'ng qayta ulanadi...")
+            await asyncio.sleep(3)
 
 async def main():
     logger.info("🚀 Mafia Bot va Web Admin Server ishga tushirilmoqda...")
