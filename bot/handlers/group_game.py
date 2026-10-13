@@ -13,20 +13,23 @@ router = Router()
 def format_lobby_text(room) -> str:
     import html
     if room.players:
-        player_links = []
-        for p in room.players.values():
+        player_lines = []
+        for i, p in enumerate(room.players.values(), 1):
             safe_name = html.escape(p.full_name)
-            link = f'<a href="tg://user?id={p.user_id}">{safe_name}</a>'
-            player_links.append(link)
-        players_text = " , ".join(player_links)
+            if p.is_bot:
+                player_lines.append(f"{i}. 🤖 <b>{safe_name}</b>")
+            else:
+                player_lines.append(f'{i}. 👤 <a href="tg://user?id={p.user_id}">{safe_name}</a>')
+        players_text = "\n".join(player_lines)
     else:
-        players_text = "Hozircha hech kim yo'q"
+        players_text = "<i>Hozircha hech kim yo'q</i>"
 
     return (
-        f"<b>Ro'yxatdan o'tish davom etmoqda!</b>\n"
-        f"Ro'yxatdan o'tganlar:\n\n"
+        f"🎭 <b>MAFIA — RO'YXATDAN O'TISH BOSHQICHI!</b>\n\n"
+        f"📋 <b>Ro'yxatdan o'tgan o'yinchilar:</b>\n"
         f"{players_text}\n\n"
-        f"Jami: <b>{len(room.players)} ta</b>"
+        f"👥 Jami: <b>{len(room.players)} ta</b> (Kamida {MIN_PLAYERS} kishi kerak)\n\n"
+        f"👇 <i>Pastdagi tugmalar orqali qo'shiling yoki o'yinni boshlang:</i>"
     )
 
 async def check_admin_permission(bot, chat_id: int, user_id: int, creator_id: int) -> bool:
@@ -66,25 +69,37 @@ async def start_game_cmd(message: Message):
 
     if existing_room:
         if existing_room.state != "LOBBY":
-            await message.answer("⚠️ <b>Guruhda ayni paytda o'yin davom etmoqda!</b>\nO'yin tugashini kuting.")
+            await message.reply(
+                "⚠️ <b>Guruhda ayni paytda o'yin davom etmoqda!</b>\nO'yin tugashini kuting.",
+                parse_mode="HTML"
+            )
             return
         else:
             can_start = await check_admin_permission(message.bot, chat_id, message.from_user.id, existing_room.creator_id)
-            if can_start:
-                if len(existing_room.players) >= MIN_PLAYERS:
-                    if existing_room.lobby_task and not existing_room.lobby_task.done():
-                        existing_room.lobby_task.cancel()
-                    await message.answer("🚀 <b>O'yin boshlanmoqda...</b>")
-                    await existing_room.start_game()
-                    return
-                else:
-                    await message.answer(
-                        f"⚠️ <b>O'yinni boshlash uchun kamida {MIN_PLAYERS} kishi kerak!</b>\n"
-                        f"Hozirda {len(existing_room.players)} ta o'yinchi bor. Qo'shilish uchun <b>'🤵 Qo'shilish'</b> tugmasini bosing yoki <b>/bot</b> yozing."
-                    )
-                    return
+            if can_start and len(existing_room.players) >= MIN_PLAYERS:
+                if existing_room.lobby_task and not existing_room.lobby_task.done():
+                    existing_room.lobby_task.cancel()
+                await message.answer("🚀 <b>O'yin boshlanmoqda! Rollar taqsimlanmoqda...</b>", parse_mode="HTML")
+                await existing_room.start_game()
+                return
             else:
-                await message.answer("⚠️ <b>O'yinga qabul allaqachon boshlangan!</b> Tepada qadalgan xabardagi <b>'🤵 Qo'shilish'</b> tugmasini bosing.")
+                bot_info = await message.bot.get_me()
+                kb = get_lobby_keyboard(chat_id, bot_info.username)
+                rem_needed = max(0, MIN_PLAYERS - len(existing_room.players))
+                warn_text = (
+                    f"⚠️ <b>Ro'yxatdan o'tish allaqachon ketmoqda!</b>\n\n"
+                    f"👥 Hozirda <b>{len(existing_room.players)} ta</b> o'yinchi ro'yxatda.\n"
+                )
+                if rem_needed > 0:
+                    warn_text += (
+                        f"O'yinni boshlash uchun yana <b>{rem_needed} ta</b> o'yinchi kerak.\n"
+                        f"<i>(O'yinchi yetishmasa, pastdagi '🤖 +Bot qo'shish' tugmasini bosishingiz mumkin)</i>\n\n"
+                    )
+                else:
+                    warn_text += "O'yin boshlanishga tayyor! <b>'🚀 O'yinni boshlash'</b> tugmasini bosing!\n\n"
+
+                warn_text += "👇 <i>Quyidagi tugmalardan foydalaning:</i>"
+                await message.reply(warn_text, reply_markup=kb, parse_mode="HTML")
                 return
 
     # Check if user is banned
@@ -213,12 +228,13 @@ async def handle_leave(call: CallbackQuery):
         pass
 
 @router.callback_query(F.data.startswith("forcestart_"))
+@router.callback_query(F.data.startswith("start_game_"))
 async def handle_force_start(call: CallbackQuery):
-    chat_id = int(call.data.replace("forcestart_", ""))
+    chat_id = int(call.data.replace("forcestart_", "").replace("start_game_", ""))
     room = game_manager.get_room(chat_id)
 
     if not room or room.state != "LOBBY":
-        await call.answer("❌ O'yin mavjud emas!", show_alert=True)
+        await call.answer("❌ O'yin mavjud emas yoki allaqachon boshlangan!", show_alert=True)
         return
 
     # Check admin permission
@@ -229,7 +245,7 @@ async def handle_force_start(call: CallbackQuery):
 
     if len(room.players) < MIN_PLAYERS:
         await call.answer(
-            f"❌ O'yinni boshlash uchun kamida {MIN_PLAYERS} kishi kerak! Hozirda {len(room.players)} kishi bor.",
+            f"❌ Kamida {MIN_PLAYERS} kishi kerak! Hozir {len(room.players)} ta o'yinchi bor.\nOdam yetmasa, '+Bot qo'shish' tugmasini bosing!",
             show_alert=True
         )
         return
@@ -238,6 +254,7 @@ async def handle_force_start(call: CallbackQuery):
         room.lobby_task.cancel()
 
     await call.answer("🚀 O'yin boshlanmoqda...")
+    await call.message.answer("🚀 <b>O'yin boshlanmoqda! Rollar shaxsiy xabarga (DM) yuborilmoqda...</b>", parse_mode="HTML")
     await room.start_game()
 
 @router.message(Command("startgame"))
