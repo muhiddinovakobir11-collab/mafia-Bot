@@ -12,7 +12,7 @@ DB_PATH = BASE_DIR / "mafia.db"
 
 # Web Admin Panel sozlamalari
 WEB_HOST = os.getenv("WEB_HOST", "0.0.0.0")
-WEB_PORT = int(os.getenv("WEB_PORT", 8000))
+WEB_PORT = int(os.getenv("PORT", os.getenv("WEB_PORT", 8000)))
 WEB_ADMIN_SECRET = os.getenv("WEB_ADMIN_SECRET", "mafia_admin_secret_8055412146")
 
 # O'yin sozlamalari

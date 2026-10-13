@@ -33,6 +33,8 @@ logger = logging.getLogger("MafiaBot")
 import socket
 
 def get_free_port(preferred: int, host: str = "0.0.0.0") -> int:
+    if os.getenv("PORT"):
+        return preferred
     for p in [preferred, 8000, 8088, 8888, 5000]:
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
