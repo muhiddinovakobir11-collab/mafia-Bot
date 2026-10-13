@@ -99,6 +99,53 @@ async def cmd_start(message: Message):
 
     user = await db.get_or_create_user(user_id, username, full_name, referred_by)
 
+    # Check clan invite
+    if len(args) > 1 and args[1].startswith("clan_"):
+        try:
+            raw_clan_id = int(args[1].replace("clan_", ""))
+            target_clan = await db.get_clan(raw_clan_id)
+            if not target_clan:
+                await message.answer("❌ <b>Bunday klan topilmadi yoki u allaqachon tarqatilgan!</b>", parse_mode="HTML")
+            else:
+                user_clan = await db.get_user_clan(user_id)
+                if user_clan:
+                    if user_clan["id"] == raw_clan_id:
+                        await message.answer(
+                            f"ℹ️ <b>Siz allaqachon [{target_clan['tag']}] {target_clan['name']} klanining a'zosisiz!</b>",
+                            parse_mode="HTML"
+                        )
+                    else:
+                        await message.answer(
+                            f"⚠️ <b>Siz allaqachon boshqa klan ([{user_clan['tag']}] {user_clan['name']}) a'zosisiz!</b>\n\n"
+                            f"Yangi klanga qo'shilish uchun avval amaldagi klaningizdan chiqishingiz kerak.",
+                            parse_mode="HTML"
+                        )
+                else:
+                    success = await db.join_clan(user_id, raw_clan_id)
+                    if success:
+                        await message.answer(
+                            f"🎉 <b>TABRIKLAYMIZ!</b> 🏰\n\n"
+                            f"Siz muvaffaqiyatli <b>[{target_clan['tag']}] {target_clan['name']}</b> klaniga a'zo bo'ldingiz!\n"
+                            f"Klaningiz bilan birgalikda eng cho'qqiga chiqing! 🔥",
+                            parse_mode="HTML"
+                        )
+                        # Notify clan owner
+                        try:
+                            if target_clan.get("owner_id") and target_clan["owner_id"] != user_id:
+                                await message.bot.send_message(
+                                    target_clan["owner_id"],
+                                    f"👥 <b>Klaningizga yangi a'zo qo'shildi!</b>\n\n"
+                                    f"👤 Yangi a'zo: <b>{full_name}</b> (@{username})\n"
+                                    f"🏰 Klaningiz qudrati oshmoqda! 🔥",
+                                    parse_mode="HTML"
+                                )
+                        except Exception as e:
+                            print(f"[Clan notify owner error]: {e}")
+                    else:
+                        await message.answer("❌ Klanga qo'shilishda xatolik yuz berdi.", parse_mode="HTML")
+        except Exception as e:
+            print(f"[Clan invite deep link error]: {e}")
+
     # If new user and has referrer, reward referrer
     if referred_by and user.get("created_at") and user.get("referred_by") == referred_by:
         await db.update_balance(referred_by, pul_diff=500, almaz_diff=2)

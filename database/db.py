@@ -776,6 +776,13 @@ class Database:
             await db.commit()
             return True
 
+    async def delete_clan(self, clan_id: int) -> bool:
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute("DELETE FROM clans WHERE id = ?;", (clan_id,))
+            await db.execute("DELETE FROM clan_members WHERE clan_id = ?;", (clan_id,))
+            await db.commit()
+            return True
+
     async def deposit_clan(self, clan_id: int, pul: int = 0, almaz: int = 0) -> bool:
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute("""
