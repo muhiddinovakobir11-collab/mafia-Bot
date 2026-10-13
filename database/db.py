@@ -114,9 +114,9 @@ class Database:
             await db.execute("""
             CREATE TABLE IF NOT EXISTS group_settings (
                 chat_id INTEGER PRIMARY KEY,
-                talk_time INTEGER DEFAULT 40,
-                vote_time INTEGER DEFAULT 35,
-                night_time INTEGER DEFAULT 35,
+                talk_time INTEGER DEFAULT 50,
+                vote_time INTEGER DEFAULT 40,
+                night_time INTEGER DEFAULT 40,
                 is_anonymous_vote INTEGER DEFAULT 0,
                 is_antispam INTEGER DEFAULT 1,
                 disabled_roles TEXT DEFAULT ''
@@ -1263,9 +1263,9 @@ class Database:
                     return dict(row)
                 return {
                     "chat_id": chat_id,
-                    "talk_time": 40,
-                    "vote_time": 35,
-                    "night_time": 35,
+                    "talk_time": 50,
+                    "vote_time": 40,
+                    "night_time": 40,
                     "is_anonymous_vote": 0,
                     "is_antispam": 1,
                     "disabled_roles": ""

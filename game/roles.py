@@ -236,19 +236,23 @@ ROLES: Dict[str, RoleInfo] = {
 def get_role_distribution(player_count: int) -> list[str]:
     """
     Distributes active roles dynamically based on player count.
-    Balanced for small and large lobbies.
+    Balanced for small and large lobbies so games don't end abruptly.
     """
     if player_count <= 3:
         # Minimal setup: 1 mafia, 1 cop, 1 citizen
         pool = ["don", "komissar", "citizen"]
     elif player_count == 4:
+        # 4 players: 1 mafia, 1 cop, 1 doctor, 1 citizen
         pool = ["don", "komissar", "laborant", "citizen"]
     elif player_count == 5:
-        pool = ["don", "mafia", "komissar", "laborant", "citizen"]
+        # 5 players: 1 mafia only! (With 2 mafias, 1 death = 2v2 = instant game over)
+        pool = ["don", "komissar", "laborant", "rais", "citizen"]
     elif player_count == 6:
+        # 6 players: 2 mafia vs 4 town
         pool = ["don", "mafia", "komissar", "laborant", "kazanova", "citizen"]
     elif player_count == 7:
-        pool = ["don", "mafia", "komissar", "laborant", "rais", "kazanova", "kotil"]
+        # 7 players: 2 mafia vs 5 town
+        pool = ["don", "mafia", "komissar", "laborant", "rais", "kazanova", "citizen"]
     elif player_count == 8:
         pool = ["don", "mafia", "komissar", "serjant", "laborant", "rais", "kazanova", "kotil"]
     elif player_count == 9:
@@ -257,7 +261,7 @@ def get_role_distribution(player_count: int) -> list[str]:
         pool = ["don", "mafia", "komissar", "serjant", "laborant", "rais", "kazanova", "ximik", "advokat", "kotil"]
     elif player_count >= 11:
         pool = ["don", "mafia", "komissar", "serjant", "laborant", "rais", "kazanova", "ximik", "vampir", "konchi", "kotil"]
-        extra_roles = ["advokat", "sehrgar", "mafia", "laborant", "konchi", "rais", "vampir", "shpion", "kupidon", "terrorist"]
+        extra_roles = ["advokat", "sehrgar", "mafia", "laborant", "konchi", "rais", "vampir", "shpion", "kupidon", "terrorist", "citizen"]
         idx = 0
         while len(pool) < player_count:
             pool.append(extra_roles[idx % len(extra_roles)])

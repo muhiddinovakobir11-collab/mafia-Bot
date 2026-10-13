@@ -105,7 +105,8 @@ def get_lobby_keyboard(chat_id: int, bot_username: str = None) -> InlineKeyboard
     join_url = f"https://t.me/{b_name}?start=join_{chat_id}"
     return InlineKeyboardMarkup(inline_keyboard=[
         [
-            InlineKeyboardButton(text="🤵 Qo'shilish", url=join_url)
+            InlineKeyboardButton(text="🤵 Qo'shilish", url=join_url),
+            InlineKeyboardButton(text="🤖 +Bot qo'shish", callback_data=f"addbot_{chat_id}")
         ],
         [
             InlineKeyboardButton(text="🚀 O'yinni boshlash", callback_data=f"forcestart_{chat_id}")

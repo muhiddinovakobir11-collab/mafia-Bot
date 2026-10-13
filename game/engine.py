@@ -267,13 +267,23 @@ class GameRoom:
         for p in self.get_alive_players():
             p.night_target_id = None
 
-        await self.broadcast_group(
-            f"🌑 <b>{self.round_number}-TUN BOSHLANDI!</b> 🌑\n\n"
-            f"Shaharda qonxo'rlar va maxfiy kuchlar uyg'onmoqda...\n"
-            f"Barcha maxsus rollar bot shaxsiy xabarida o'z tanlovlarini amalga oshirsin!\n"
-            f"<i>(🤫 Qoidabuzarlikning oldini olish uchun guruhda xabar yozish tonggacha cheklandi!)</i>\n"
-            f"⏳ <b>Vaqt:</b> {night_time} soniya."
-        )
+        if self.round_number == 1:
+            await self.broadcast_group(
+                f"🌑 <b>1-TUN: TANISHUV TUNI!</b> 🌑\n\n"
+                f"Shahar uzra dastlabki qorong'ulik tushmoqda...\n"
+                f"🤝 <i>Bu kecha qon to'kilmaydi — Mafiya o'z sheriklari bilan tanishadi, maxsus kuchlar esa shaharni ko'zdan kechiradi!</i>\n"
+                f"Barcha maxsus rollar bot shaxsiy xabarida o'z tanlovlarini amalga oshirsin!\n"
+                f"<i>(🤫 Qoidabuzarlikning oldini olish uchun guruhda xabar yozish tonggacha cheklandi!)</i>\n"
+                f"⏳ <b>Vaqt:</b> {night_time} soniya."
+            )
+        else:
+            await self.broadcast_group(
+                f"🌑 <b>{self.round_number}-TUN BOSHLANDI!</b> 🌑\n\n"
+                f"Shaharda qonxo'rlar va maxfiy kuchlar uyg'onmoqda...\n"
+                f"Barcha maxsus rollar bot shaxsiy xabarida o'z tanlovlarini amalga oshirsin!\n"
+                f"<i>(🤫 Qoidabuzarlikning oldini olish uchun guruhda xabar yozish tonggacha cheklandi!)</i>\n"
+                f"⏳ <b>Vaqt:</b> {night_time} soniya."
+            )
 
         # 1. Tungi Avto-Mute (Auto-Mute at Night in Groups)
         if self.chat_id < 0:
@@ -318,13 +328,22 @@ class GameRoom:
                 buttons.append(row)
 
             kb = InlineKeyboardMarkup(inline_keyboard=buttons) if buttons else None
-            prompt_text = (
-                f"🌑 <b>TUN #{self.round_number}</b>\n"
-                f"Siz: {r_info.emoji} <b>{r_info.name}</b>\n\n"
-                f"{r_info.night_prompt}"
-            )
+            if self.round_number == 1 and r_info.team in [Team.MAFIA, Team.MANIAC]:
+                prompt_text = (
+                    f"🌑 <b>TUN #{self.round_number} (Tanishuv tuni)</b>\n"
+                    f"Siz: {r_info.emoji} <b>{r_info.name}</b>\n\n"
+                    f"🤝 <i>Bu kecha tanishuv tuni bo'lgani sababli qotillik sodir bo'lmaydi.</i>\n"
+                    f"Shubhangizdagi o'yinchini nishonga oling:"
+                )
+            else:
+                prompt_text = (
+                    f"🌑 <b>TUN #{self.round_number}</b>\n"
+                    f"Siz: {r_info.emoji} <b>{r_info.name}</b>\n\n"
+                    f"{r_info.night_prompt}"
+                )
             await self.send_dm(p.user_id, prompt_text, reply_markup=kb)
 
+        night_start = time.time()
         # Smart Night: check if all choices ready (e.g. only bots)
         if self.check_all_night_actions_done():
             self.night_event.set()
@@ -334,6 +353,15 @@ class GameRoom:
             await asyncio.wait_for(self.night_event.wait(), timeout=night_time)
         except asyncio.TimeoutError:
             pass
+
+        # Minimum suspense duration so night doesn't feel instant (at least 15s)
+        elapsed = time.time() - night_start
+        min_night_pause = min(15, night_time)
+        if elapsed < min_night_pause:
+            await asyncio.sleep(min_night_pause - elapsed)
+
+        await self.broadcast_group("🌅 <b>Tong otmoqda... Shahar uyg'onmoqda!</b>")
+        await asyncio.sleep(2)
 
         # Resolve night actions
         await self.resolve_night_actions()
@@ -451,12 +479,13 @@ class GameRoom:
                         )
                         break
 
-        # Collect victims
+        # Collect victims (1-tunda, ya'ni Tanishuv tunida qotillik sodir bo'lmaydi)
         killed_ids = set()
-        if mafia_target_id and mafia_target_id in alive_map:
-            killed_ids.add(mafia_target_id)
-        if maniac_target_id and maniac_target_id in alive_map:
-            killed_ids.add(maniac_target_id)
+        if self.round_number > 1:
+            if mafia_target_id and mafia_target_id in alive_map:
+                killed_ids.add(mafia_target_id)
+            if maniac_target_id and maniac_target_id in alive_map:
+                killed_ids.add(maniac_target_id)
 
         # Check if saved by heal, shield or items
         actually_killed: List[Player] = []
@@ -514,11 +543,18 @@ class GameRoom:
             victims_str = "\n".join([f"⚰️ {p.tag} ({ROLES[p.role_code].emoji} <b>{ROLES[p.role_code].name}</b>)" for p in night_killed])
             morning_msg += f"💀 <b>KECHASI QOTILLIK SODIR BO'LDI! HALOK BO'LGANLAR:</b>\n{victims_str}\n\n"
         else:
-            morning_msg += "🎉 <b>Xushxabar!</b> Bu kecha hech kim qurbon bo'lmadi, shahar omon qoldi!\n\n"
+            if self.round_number == 1:
+                morning_msg += "🎉 <b>Tanishuv tuni ortda qoldi! Barcha fuqarolar omon!</b>\nEndi bir-biringiz bilan fikr almashib, oramizdagi Mafiyani fosh qilish vaqti keldi!\n\n"
+            else:
+                morning_msg += "🎉 <b>Xushxabar!</b> Bu kecha hech kim qurbon bo'lmadi, shahar omon qoldi!\n\n"
 
         alive = self.get_alive_players()
         morning_msg += f"👥 <b>Tirik qolganlar ({len(alive)} kishi):</b>\n"
         morning_msg += "\n".join([f"• {p.tag}" for p in alive])
+
+        settings = await db.get_group_settings(self.chat_id)
+        talk_time = settings.get("talk_time", DAY_TALK_TIMEOUT)
+        morning_msg += f"\n\n💬 <b>Muhokama vaqti:</b> {talk_time} soniya.\n<i>(Muhokamani yakunlab tezroq sudga o'tish uchun: /vote)</i>"
         # Kunduzi guruh a'zolariga yozishga ruxsat beriladi (Unmute)
         if self.chat_id < 0:
             try:
@@ -549,10 +585,7 @@ class GameRoom:
         if await self.check_win_condition():
             return
 
-
         # Day discussion timer with /vote early skip support
-        settings = await db.get_group_settings(self.chat_id)
-        talk_time = settings.get("talk_time", DAY_TALK_TIMEOUT)
         self.talk_event = asyncio.Event()
         try:
             await asyncio.wait_for(self.talk_event.wait(), timeout=talk_time)
@@ -601,6 +634,7 @@ class GameRoom:
         if msg:
             self.vote_message_id = msg.message_id
 
+        vote_start = time.time()
         self.vote_event = asyncio.Event()
         if self.check_all_votes_done():
             self.vote_event.set()
@@ -609,6 +643,12 @@ class GameRoom:
             await asyncio.wait_for(self.vote_event.wait(), timeout=vote_time)
         except asyncio.TimeoutError:
             pass
+
+        # Minimum suspense duration so voting doesn't vanish instantly
+        elapsed = time.time() - vote_start
+        min_vote_pause = min(10, vote_time)
+        if elapsed < min_vote_pause:
+            await asyncio.sleep(min_vote_pause - elapsed)
 
         await self.tally_votes()
 
@@ -775,6 +815,9 @@ class GameRoom:
             winner = "💘 <b>SEVISHGANLAR G'ALABA QOZONDI!</b>\nIkki oshiq barcha xavflardan omon qolib, g'alabaga erishdi!"
             winner_team = Team.NEUTRAL
         elif mafia_count >= (total_alive - mafia_count) and maniac_count == 0 and vampire_count == 0:
+            # Round 1 kunduzi muhokama paytida o'yin birdan tugab qolmasligi uchun (shahar sudiga imkoniyat)
+            if self.round_number == 1 and self.state == "DAY_TALK" and citizen_count > 0:
+                return False
             winner = "🎩 <b>MAFIYA G'ALABA QOZONDI!</b>\nShahar to'liq mafiya nazorati ostiga o'tdi!"
             winner_team = Team.MAFIA
         elif mafia_count == 0 and maniac_count == 0 and vampire_count == 0:

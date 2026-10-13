@@ -30,10 +30,10 @@ WEB_ADMIN_SECRET = os.getenv("WEB_ADMIN_SECRET", "mafia_admin_secret_8055412146"
 
 # O'yin sozlamalari
 MIN_PLAYERS = 3       # Test va tezkor boshlash uchun (odatda 4-5)
-LOBBY_TIMEOUT = 45    # O'yin yig'ilish taymeri (soniya)
-NIGHT_TIMEOUT = 35    # Tun vaqti (soniya)
-DAY_TALK_TIMEOUT = 40 # Kunduzgi muhokama vaqti (soniya)
-VOTE_TIMEOUT = 35     # Ovoz berish vaqti (soniya)
+LOBBY_TIMEOUT = 60    # O'yin yig'ilish taymeri (soniya, 1 daqiqa)
+NIGHT_TIMEOUT = 40    # Tun vaqti (soniya)
+DAY_TALK_TIMEOUT = 50 # Kunduzgi muhokama vaqti (soniya)
+VOTE_TIMEOUT = 40     # Ovoz berish vaqti (soniya)
 
 # SofPay To'lov Tizimi sozlamalari
 SOFPAY_SHOP_KEY = os.getenv("SOFPAY_SHOP_KEY", "sk_5b96eeebf9e5d73f32a50a423e06f22b")
