@@ -10,9 +10,10 @@ def get_main_keyboard(is_admin: bool = False) -> ReplyKeyboardMarkup:
     kb = [
         [KeyboardButton(text="🔵 👤 Profil & Balans"), KeyboardButton(text="🟣 🛍️ Do'kon & Narsalar")],
         [KeyboardButton(text="🟢 💳 Karta orqali xarid"), KeyboardButton(text="🟡 ⭐️ Stars to'ldirish")],
-        [KeyboardButton(text="🏰 Mafia Klani"), KeyboardButton(text="🎯 Kunlik Missiyalar")],
-        [KeyboardButton(text="🎁 Kunlik bonus"), KeyboardButton(text="🏆 Reyting & Top")],
-        [KeyboardButton(text="📖 O'yin qoidalari & Rollar"), KeyboardButton(text="🤝 Do'stlarni taklif qilish")]
+        [KeyboardButton(text="🏰 Mafia Klani"), KeyboardButton(text="🎰 Kazino & O'yinlar")],
+        [KeyboardButton(text="🎯 Kunlik Missiyalar"), KeyboardButton(text="🎁 Kunlik bonus")],
+        [KeyboardButton(text="🏆 Reyting & Top"), KeyboardButton(text="🤝 Do'stlarni taklif qilish")],
+        [KeyboardButton(text="📖 O'yin qoidalari & Rollar"), KeyboardButton(text="➕ Botni guruhga qo'shish")]
     ]
     if is_admin:
         kb.append([KeyboardButton(text="🔴 ⚙️ Admin Panel")])
@@ -132,5 +133,25 @@ def get_admin_main_keyboard() -> InlineKeyboardMarkup:
         [
             InlineKeyboardButton(text="🔵 📢 Xabar tarqatish (Broadcast)", callback_data="adm_broadcast"),
             InlineKeyboardButton(text="🟢 🌐 Web Panel havolasi", callback_data="adm_weblink")
+        ],
+        [
+            InlineKeyboardButton(text="💾 Baza Zaxirasi & Cloud Sync", callback_data="adm_dbsync")
         ]
     ])
+
+def get_casino_menu_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="🎰 Slot Mashinasi", callback_data="play_slot_fast"),
+            InlineKeyboardButton(text="🎯 Darts Otish", callback_data="play_darts_fast")
+        ],
+        [
+            InlineKeyboardButton(text="🎲 Omadli Kubik", callback_data="play_dice_fast"),
+            InlineKeyboardButton(text="⚔️ Duel Qoidalari", callback_data="duel_help_info")
+        ],
+        [
+            InlineKeyboardButton(text="💍 Nikoh & Oila", callback_data="marriage_info"),
+            InlineKeyboardButton(text="🎟️ Promo-kod faollashtirish", callback_data="promo_code_enter")
+        ]
+    ])
+

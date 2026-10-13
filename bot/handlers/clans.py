@@ -205,13 +205,15 @@ async def clan_deposit_pul_received(message: Message, state: FSMContext):
         return
 
     await db.update_balance(user_id, pul_diff=-amount)
-    await db.deposit_clan(clan["id"], pul=amount)
+    _, leveled_up, new_lvl = await db.deposit_clan(clan["id"], pul=amount)
     await state.clear()
-    await message.answer(
+    msg = (
         f"✅ <b>Klan xazinasiga {amount:,} Pul muvaffaqiyatli qo'shildi!</b>\n"
-        f"Klaningiz qudrati oshdi! 🏰",
-        parse_mode="HTML"
+        f"Klaningiz qudrati oshdi! 🏰"
     )
+    if leveled_up:
+        msg += f"\n\n🎉 <b>TABRIKLAYMIZ! KLAN DARAJASI OSHDI!</b> 🎖️\nKlaningiz endi <b>{new_lvl}-daraja</b>ga yetdi! Barcha a'zolarga o'yinlarda ko'proq yutuq va bonuslar beriladi! 🔥"
+    await message.answer(msg, parse_mode="HTML")
 
 @router.callback_query(F.data == "clan_deposit_almaz")
 async def clan_deposit_almaz_start(call: CallbackQuery, state: FSMContext):
@@ -257,13 +259,15 @@ async def clan_deposit_almaz_received(message: Message, state: FSMContext):
         return
 
     await db.update_balance(user_id, almaz_diff=-amount)
-    await db.deposit_clan(clan["id"], almaz=amount)
+    _, leveled_up, new_lvl = await db.deposit_clan(clan["id"], almaz=amount)
     await state.clear()
-    await message.answer(
+    msg = (
         f"✅ <b>Klan xazinasiga {amount:,} Almaz muvaffaqiyatli qo'shildi!</b>\n"
-        f"Klaningiz qudrati oshdi! 💎🏰",
-        parse_mode="HTML"
+        f"Klaningiz qudrati oshdi! 💎🏰"
     )
+    if leveled_up:
+        msg += f"\n\n🎉 <b>TABRIKLAYMIZ! KLAN DARAJASI OSHDI!</b> 🎖️\nKlaningiz endi <b>{new_lvl}-daraja</b>ga yetdi! Barcha a'zolarga o'yinlarda ko'proq yutuq va bonuslar beriladi! 🔥"
+    await message.answer(msg, parse_mode="HTML")
 
 @router.callback_query(F.data == "clan_leave_confirm")
 async def clan_leave_confirm_handler(call: CallbackQuery):

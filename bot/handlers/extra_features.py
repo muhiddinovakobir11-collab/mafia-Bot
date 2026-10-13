@@ -16,8 +16,74 @@ from config import ADMIN_IDS
 from database.db import db
 from game.engine import game_manager
 from game.roles import ROLES
+from bot.keyboards import get_casino_menu_keyboard
 
 router = Router()
+
+# ==============================================================================
+# 0. KAZINO ASOSIY MENYUSI
+# ==============================================================================
+@router.message(F.text.contains("Kazino & O'yinlar"))
+@router.message(Command("games"))
+async def show_casino_menu(message: Message):
+    user = await db.get_user(message.from_user.id)
+    pul_bal = user["pul"] if user else 0
+    almaz_bal = user["almaz"] if user else 0
+    text = (
+        f"🎰 <b>KAZINO VA MINI-O'YINLAR ZALI</b> 🎲\n\n"
+        f"Mablag'ingiz: <b>{pul_bal:,} Pul</b> | 💎 <b>{almaz_bal} Almaz</b>\n\n"
+        f"Bu yerda omadingizni sinab ko'rishingiz, do'stlaringiz bilan bellashishingiz yoki sovrinlar yutib olishingiz mumkin!\n\n"
+        f"🎮 <b>O'yinni tanlang:</b>"
+    )
+    await message.answer(text, parse_mode="HTML", reply_markup=get_casino_menu_keyboard())
+
+@router.callback_query(F.data == "play_slot_fast")
+async def play_slot_fast_cb(call: CallbackQuery):
+    await call.answer()
+    await play_slot_machine(call.message)
+
+@router.callback_query(F.data == "play_darts_fast")
+async def play_darts_fast_cb(call: CallbackQuery):
+    await call.answer()
+    await play_darts(call.message)
+
+@router.callback_query(F.data == "play_dice_fast")
+async def play_dice_fast_cb(call: CallbackQuery):
+    await call.answer()
+    await play_dice(call.message)
+
+@router.callback_query(F.data == "duel_help_info")
+async def duel_help_cb(call: CallbackQuery):
+    text = (
+        "⚔️ <b>DUEL JANGI QOIDALARI:</b>\n\n"
+        "Guruhda yoki shaxsiyda boshqa o'yinchiga javob (reply) qilib:\n"
+        "<code>/duel 500</code>\n\n"
+        "buyrug'ini yuboring. Raqibingiz qabul qilsa, duel boshlanadi va g'olib barcha garovni oladi!"
+    )
+    await call.message.answer(text, parse_mode="HTML")
+    await call.answer()
+
+@router.callback_query(F.data == "marriage_info")
+async def marriage_info_cb(call: CallbackQuery):
+    text = (
+        "💍 <b>NIKOH VA OILA TIZIMI:</b>\n\n"
+        "O'z juftingizga turmush qurish taklifini bildirish uchun uning xabariga javob (reply) qilib:\n"
+        "<code>/marry</code>\n\n"
+        "buyrug'ini yuboring. Eslatma: Do'kondan <b>💍 Oltin Nikoh Uzugi</b> sotib olgan bo'lishingiz kerak!"
+    )
+    await call.message.answer(text, parse_mode="HTML")
+    await call.answer()
+
+@router.callback_query(F.data == "promo_code_enter")
+async def promo_code_info_cb(call: CallbackQuery):
+    text = (
+        "🎟️ <b>PROMO-KODNI FAOLLASHTIRISH:</b>\n\n"
+        "Botda promo-kodni faollashtirish uchun botga:\n"
+        "<code>/promo KOD</code>\n\n"
+        "deb yuboring (Masalan: <code>/promo START</code>)."
+    )
+    await call.message.answer(text, parse_mode="HTML")
+    await call.answer()
 
 # ==============================================================================
 # 1. KAZINO SLOT MASHINASI (/slot <pul>)

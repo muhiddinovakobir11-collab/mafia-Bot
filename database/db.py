@@ -1,6 +1,6 @@
 import aiosqlite
 import time
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Tuple
 from config import DB_PATH, ADMIN_IDS
 
 DEFAULT_ITEMS = [
@@ -59,6 +59,8 @@ class Database:
 
     async def init(self):
         async with aiosqlite.connect(self.db_path) as db:
+            await db.execute("PRAGMA journal_mode=WAL;")
+            await db.execute("PRAGMA synchronous=NORMAL;")
             await db.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY,
@@ -783,15 +785,34 @@ class Database:
             await db.commit()
             return True
 
-    async def deposit_clan(self, clan_id: int, pul: int = 0, almaz: int = 0) -> bool:
+    async def deposit_clan(self, clan_id: int, pul: int = 0, almaz: int = 0) -> Tuple[bool, bool, int]:
         async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute("SELECT level, treasury_pul FROM clans WHERE id = ?;", (clan_id,)) as cur:
+                row = await cur.fetchone()
+                if not row:
+                    return False, False, 1
+                old_lvl = row["level"]
+                total_pul = row["treasury_pul"] + pul
+
+            new_lvl = 1
+            if total_pul >= 100000:
+                new_lvl = 5
+            elif total_pul >= 50000:
+                new_lvl = 4
+            elif total_pul >= 25000:
+                new_lvl = 3
+            elif total_pul >= 10000:
+                new_lvl = 2
+
+            leveled_up = (new_lvl > old_lvl)
             await db.execute("""
                 UPDATE clans
-                SET treasury_pul = treasury_pul + ?, treasury_almaz = treasury_almaz + ?
+                SET treasury_pul = treasury_pul + ?, treasury_almaz = treasury_almaz + ?, level = ?
                 WHERE id = ?;
-            """, (pul, almaz, clan_id))
+            """, (pul, almaz, new_lvl, clan_id))
             await db.commit()
-            return True
+            return True, leveled_up, new_lvl
 
     async def get_top_clans(self, limit: int = 10) -> List[Dict[str, Any]]:
         async with aiosqlite.connect(self.db_path) as db:

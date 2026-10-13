@@ -13,6 +13,7 @@ from aiogram.client.default import DefaultBotProperties
 
 from config import BOT_TOKEN, WEB_HOST, WEB_PORT
 from database.db import db
+from database.db_sync import db_sync
 from bot.handlers import (
     start_router,
     game_router,
@@ -78,10 +79,19 @@ async def run_bot():
     dp.include_router(card_router)
     dp.include_router(extra_features_router)
 
-    # Initialize database
+    # Initialize database with cloud persistence
+    logger.info("📦 Ma'lumotlar bazasi Cloud zaxiradan tekshirilmoqda...")
+    await db_sync.restore_from_cloud()
+
     logger.info("📦 Ma'lumotlar bazasi initsializatsiya qilinmoqda...")
     await db.init()
     logger.info("✅ Ma'lumotlar bazasi tayyor!")
+
+    # Initial cloud sync
+    await db_sync.backup_to_cloud()
+
+    # Start background auto backup loop (every 5 minutes)
+    asyncio.create_task(db_sync.run_auto_backup_loop(interval_seconds=300))
 
     # Delete existing webhook if any and start polling with auto-retry
     while True:
@@ -105,4 +115,8 @@ if __name__ == "__main__":
     try:
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
+        try:
+            asyncio.run(db_sync.backup_to_cloud())
+        except Exception:
+            pass
         logger.info("🛑 Bot va Server to'xtatildi.")

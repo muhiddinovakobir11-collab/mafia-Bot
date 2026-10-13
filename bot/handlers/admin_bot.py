@@ -797,3 +797,98 @@ async def show_weblink(call: CallbackQuery):
     ])
     await call.message.edit_text(text, parse_mode="HTML", reply_markup=kb)
     await call.answer()
+
+# --- DATABASE SYNC & BACKUP ---
+
+@router.callback_query(F.data == "adm_dbsync")
+async def show_adm_dbsync(call: CallbackQuery):
+    if not is_admin(call.from_user.id):
+        return
+
+    import time
+    from pathlib import Path
+    from database.db_sync import db_sync
+    from config import GITHUB_REPO
+
+    db_p = Path(db.db_path)
+    file_size_kb = (db_p.stat().st_size / 1024) if db_p.exists() else 0
+    stats = await db.get_stats()
+    clans = await db.get_top_clans(100)
+
+    last_sync_str = (
+        time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(db_sync.last_backup_time))
+        if db_sync.last_backup_time else "Hali bajarilmadi"
+    )
+
+    text = (
+        "💾 <b>MA'LUMOTLAR BAZASI VA CLOUD SINXRONIZATSIYASI</b>\n\n"
+        f"📁 <b>Fayl hajmi:</b> {file_size_kb:.1f} KB\n"
+        f"👥 <b>Foydalanuvchilar:</b> {stats['total_users']} ta\n"
+        f"🏰 <b>Klanlar:</b> {len(clans)} ta\n"
+        f"🕹 <b>Jami o'yinlar:</b> {stats['total_games']} ta\n\n"
+        f"☁️ <b>GitHub Cloud Baza:</b> <code>{GITHUB_REPO}</code>\n"
+        f"🔄 <b>Oxirgi Cloud Sync:</b> {last_sync_str}\n"
+        f"📊 <b>Cloud Holati:</b> {db_sync.last_backup_status}\n\n"
+        "<i>Render qayta ishga tushganda yoki yangi kod yuklanganda barcha ma'lumotlar Cloud'dan avtomatik tiklanadi!</i>"
+    )
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📥 Bazani yuklab olish (.db)", callback_data="adm_download_db")],
+        [InlineKeyboardButton(text="🔄 Cloud'ga hozir saqlash (Force Sync)", callback_data="adm_force_cloud_backup")],
+        [InlineKeyboardButton(text="🔙 Orqaga", callback_data="adm_back")]
+    ])
+    await call.message.edit_text(text, parse_mode="HTML", reply_markup=kb)
+    await call.answer()
+
+@router.callback_query(F.data == "adm_force_cloud_backup")
+async def adm_force_cloud_backup_cb(call: CallbackQuery):
+    if not is_admin(call.from_user.id):
+        return
+
+    from database.db_sync import db_sync
+    await call.answer("⏳ Baza GitHub Cloud'ga saqlanmoqda...", show_alert=False)
+    success = await db_sync.backup_to_cloud()
+    if success:
+        await call.answer("✅ Baza GitHub Cloud'ga muvaffaqiyatli saqlandi!", show_alert=True)
+    else:
+        await call.answer(f"❌ Xatolik: {db_sync.last_backup_status}", show_alert=True)
+    await show_adm_dbsync(call)
+
+@router.callback_query(F.data == "adm_download_db")
+async def adm_download_db_cb(call: CallbackQuery):
+    if not is_admin(call.from_user.id):
+        return
+
+    from aiogram.types import FSInputFile
+    import time
+    db_file = FSInputFile(str(db.db_path), filename=f"mafia_backup_{int(time.time())}.db")
+    await call.message.answer_document(
+        document=db_file,
+        caption="💾 <b>Joriy Mafia ma'lumotlar bazasi nusxasi (.db)</b>",
+        parse_mode="HTML"
+    )
+    await call.answer()
+
+@router.message(Command("backup"))
+async def cmd_backup(message: Message):
+    if not is_admin(message.from_user.id):
+        return
+
+    from aiogram.types import FSInputFile
+    from database.db_sync import db_sync
+    import time
+
+    status_msg = await message.answer("⏳ Baza zaxiralanmoqda va Cloud'ga yuborilmoqda...")
+    await db_sync.backup_to_cloud()
+
+    db_file = FSInputFile(str(db.db_path), filename=f"mafia_backup_{int(time.time())}.db")
+    await message.answer_document(
+        document=db_file,
+        caption=(
+            f"💾 <b>MAFIA BAZASI ZAXIRA NUSXASI</b>\n\n"
+            f"📅 Vaqt: {time.strftime('%Y-%m-%d %H:%M:%S')}\n"
+            f"☁️ Cloud Sync: {db_sync.last_backup_status}"
+        ),
+        parse_mode="HTML"
+    )
+    await status_msg.delete()
+

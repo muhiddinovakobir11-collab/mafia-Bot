@@ -15,10 +15,10 @@ dist/
 build/
 
 # Databases & Local state
-*.db
-*.sqlite
-*.sqlite3
-mafia.db
+*.db-shm
+*.db-wal
+*temp_backup*.db
+test_temp.db
 
 # Secrets & local env
 .env
