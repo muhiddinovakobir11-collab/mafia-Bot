@@ -749,9 +749,10 @@ async def handle_robbery(message: Message):
 # 15. OBRO' VA KARMA TIZIMI (/rep + / /rep -)
 # ==============================================================================
 @router.message(Command("rep"))
+@router.message(F.text.in_(["+rep", "-rep", "+1", "-1", "+REP", "-REP"]))
 async def handle_reputation(message: Message):
     if not message.reply_to_message or message.reply_to_message.from_user.is_bot:
-        await message.answer("⭐ <b>Obro' berish uchun:</b>\nFoydalanuvchi xabariga reply qilib <code>/rep +</code> yoki <code>/rep -</code> deb yozing.")
+        await message.answer("⭐ <b>Obro' berish uchun:</b>\nFoydalanuvchi xabariga reply (javob) qilib <code>/rep +</code> yoki <code>+rep</code> (pasaytirish uchun <code>/rep -</code> yoki <code>-rep</code>) deb yozing.")
         return
 
     target_id = message.reply_to_message.from_user.id
@@ -759,10 +760,14 @@ async def handle_reputation(message: Message):
         await message.answer("⚠️ O'zingizga obro' bera olmaysiz!")
         return
 
-    args = message.text.split()
+    raw_text = (message.text or "").strip().lower()
     delta = 1
-    if len(args) > 1 and args[1] in ["-", "--", "minus"]:
+    if raw_text in ["-rep", "-1"] or raw_text.startswith("-") or "minus" in raw_text:
         delta = -1
+    else:
+        args = message.text.split()
+        if len(args) > 1 and args[1] in ["-", "--", "minus"]:
+            delta = -1
 
     res = await db.change_rep(message.from_user.id, target_id, delta)
     if not res["success"]:
