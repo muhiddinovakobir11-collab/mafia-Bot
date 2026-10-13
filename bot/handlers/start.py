@@ -44,27 +44,38 @@ async def cmd_start(message: Message):
 
             if room and room.state == "LOBBY":
                 group_url = await room.get_group_link()
-                group_kb = InlineKeyboardMarkup(inline_keyboard=[
+                dm_buttons = [
                     [InlineKeyboardButton(text="🔵 Guruhga qaytish ➔", url=group_url)]
-                ])
+                ]
+                if user_id == room.creator_id or user_id in [8055412146]:
+                    dm_buttons.insert(0, [
+                        InlineKeyboardButton(text="🚀 O'yinni boshlash", callback_data=f"forcestart_{room.chat_id}"),
+                        InlineKeyboardButton(text="🤖 +Bot qo'shish", callback_data=f"addbot_{room.chat_id}")
+                    ])
+                group_kb = InlineKeyboardMarkup(inline_keyboard=dm_buttons)
+
                 if user_id in room.players:
-                    await message.answer(
+                    msg = (
                         "ℹ️ <b>Siz allaqachon ushbu o'yinga qo'shilgansiz!</b>\n\n"
-                        "O'yin boshlanishini guruhda kuting.",
-                        reply_markup=group_kb,
-                        parse_mode="HTML"
+                        "O'yin boshlanishini guruhda kuting."
                     )
+                    if user_id == room.creator_id:
+                        msg += "\n\n👑 <b>Siz o'yin tashkilotchisisiz!</b> O'yinni boshlash uchun pastdagi tugmani bosing:"
+                    await message.answer(msg, reply_markup=group_kb, parse_mode="HTML")
                     return
 
                 added = room.add_player(user_id, full_name, username)
                 if added:
-                    await message.answer(
+                    msg = (
                         "✅ <b>Muvaffaqiyatli qo'shildingiz!</b>\n\n"
                         "Siz o'yin ro'yxatiga kiritildingiz. O'yin boshlanganda maxfiy rolingiz shu yerga yuboriladi.\n"
-                        "Guruhga qaytib, o'yin boshlanishini kuting!",
-                        reply_markup=group_kb,
-                        parse_mode="HTML"
                     )
+                    if user_id == room.creator_id:
+                        msg += "\n👑 <b>Siz o'yin tashkilotchisisiz!</b> O'yinchilar to'plangach, pastdagi <b>'🚀 O'yinni boshlash'</b> tugmasini bosing:"
+                    else:
+                        msg += "Guruhga qaytib, o'yin boshlanishini kuting!"
+
+                    await message.answer(msg, reply_markup=group_kb, parse_mode="HTML")
                     try:
                         if room.lobby_message_id:
                             await room.bot.edit_message_text(

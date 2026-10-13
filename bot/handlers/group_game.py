@@ -129,6 +129,25 @@ async def start_game_cmd(message: Message):
     except Exception as e:
         print(f"[Auto-pin Error in chat {chat_id}]: {e}")
 
+    # Send creator private DM with control buttons
+    try:
+        group_link = await room.get_group_link()
+        creator_kb = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🚀 O'yinni boshlash", callback_data=f"forcestart_{chat_id}")],
+            [InlineKeyboardButton(text="🤖 +Bot qo'shish", callback_data=f"addbot_{chat_id}")],
+            [InlineKeyboardButton(text="🔵 Guruhga qaytish ➔", url=group_link)]
+        ])
+        await message.bot.send_message(
+            message.from_user.id,
+            f"👑 <b>Siz '{message.chat.title}' guruhida yangi o'yin ochdingiz!</b>\n\n"
+            f"Guruhdagi boshqa o'yinchilar <b>'🤵 Qo'shilish'</b> tugmasini bosib botga kirishmoqda.\n\n"
+            f"Kamida 3 kishi to'plangach, o'yinni boshlash uchun pastdagi <b>'🚀 O'yinni boshlash'</b> tugmasini bosing:",
+            reply_markup=creator_kb,
+            parse_mode="HTML"
+        )
+    except Exception:
+        pass
+
 @router.callback_query(F.data.startswith("join_"))
 async def handle_join(call: CallbackQuery):
     chat_id = int(call.data.replace("join_", ""))
@@ -240,7 +259,7 @@ async def handle_force_start(call: CallbackQuery):
     # Check admin permission
     can_start = await check_admin_permission(call.bot, chat_id, call.from_user.id, room.creator_id)
     if not can_start:
-        await call.answer("⚠️ Faqat guruh admini yoki o'yin yaratuvchisi o'yinni boshlashi mumkin!", show_alert=True)
+        await call.answer("⚠️ Faqat o'yinni boshlagan tashkilotchi (yoki admin) o'yinni boshlay oladi!", show_alert=True)
         return
 
     if len(room.players) < MIN_PLAYERS:
@@ -254,7 +273,12 @@ async def handle_force_start(call: CallbackQuery):
         room.lobby_task.cancel()
 
     await call.answer("🚀 O'yin boshlanmoqda...")
-    await call.message.answer("🚀 <b>O'yin boshlanmoqda! Rollar shaxsiy xabarga (DM) yuborilmoqda...</b>", parse_mode="HTML")
+    try:
+        await room.bot.send_message(chat_id, "🚀 <b>O'yin boshlanmoqda! Rollar shaxsiy xabarga (DM) yuborilmoqda...</b>", parse_mode="HTML")
+    except Exception:
+        pass
+    if call.message.chat.id != chat_id:
+        await call.message.answer("🚀 <b>O'yin boshlandi! Guruhga qaytishingiz mumkin.</b>", parse_mode="HTML")
     await room.start_game()
 
 @router.message(Command("startgame"))
