@@ -21,8 +21,16 @@ DEFAULT_ITEMS = [
     ("vip_7", "👑 VIP Status (7 kun)", "👑", "Ism yonida 👑 toji, 1.5x XP va Pul, har kuni 2 tadan bepul Almaz.", 0, 25, 1),
     ("vip_30", "👑 VIP Status (30 kun)", "👑", "Ism yonida 👑 toji, 1.5x XP va Pul, har kuni 2 tadan bepul Almaz.", 0, 75, 1),
     ("nikoh_uzuk", "💍 Oltin Nikoh Uzugi", "💍", "Sevgan insoningiz bilan turmush qurish uchun uzuk.", 5000, 10, 1),
-    ("mashina_kaban", "🚘 Mercedes W140 ('Kaban')", "🚘", "Klassik mafioz mashinasi. Suiqasddan 20% qochish imkoniyati.", 15000, 30, 1),
-    ("mashina_bmw", "🏎️ BMW M5 F90", "🏎️", "Tezkor mafiya poygachisi. Suiqasddan 30% qochish imkoniyati.", 30000, 60, 1),
+    ("mashina_matiz", "🚗 Daewoo Matiz ('Tezkor')", "🚗", "Kichik va chaqqon shahar mashinasi. Tungi suiqasddan 10% qochish imkoniyati.", 5000, 10, 1),
+    ("mashina_nexia", "🚙 Daewoo Nexia 2 ('Xalqona')", "🚙", "Haqiqiy xalqona mashina. Tungi suiqasddan 12% qochish imkoniyati.", 7000, 15, 1),
+    ("mashina_gentra", "🚙 Chevrolet Gentra ('Qora Gentra')", "🚙", "Mafiozlarning sevimli mashinasi. Tungi suiqasddan 15% qochish imkoniyati.", 10000, 20, 1),
+    ("mashina_monza", "🚗 Chevrolet Monza", "🚗", "Zamonaviy shahar mashinasi. Tungi suiqasddan 18% qochish imkoniyati.", 12000, 25, 1),
+    ("mashina_kaban", "🚘 Mercedes W140 ('Kaban')", "🚘", "Klassik 90-yillar afsonasi. Tungi suiqasddan 20% qochish imkoniyati.", 15000, 30, 1),
+    ("mashina_malibu", "🚔 Chevrolet Malibu 2 ('Black Edition')", "🚔", "Hashamatli biznes sedan. Tungi suiqasddan 25% qochish imkoniyati.", 22000, 45, 1),
+    ("mashina_bmw", "🏎️ BMW M5 F90", "🏎️", "Tezkor mafiya poygachisi. Tungi suiqasddan 30% qochish imkoniyati.", 30000, 60, 1),
+    ("mashina_gelik", "🚙 Mercedes-Benz G63 ('Gelik / G-Wagen')", "🚙", "Zirhlangan mafiya jipi. Tungi suiqasddan 35% qochish imkoniyati.", 50000, 100, 1),
+    ("mashina_porsche", "🏎️ Porsche 911 Turbo S", "🏎️", "Gipertezlikdagi sportkar. Tungi suiqasddan 40% qochish imkoniyati.", 80000, 150, 1),
+    ("mashina_rolls", "👑 Rolls-Royce Phantom ('Don Karleone')", "👑", "Eng hashamatli mafioz limuzini. Tungi suiqasddan 50% qochish imkoniyati!", 150000, 300, 1),
     ("signalizatsiya", "🚨 O'g'rilikdan signalizatsiya", "🚨", "Cho'ntakkesarlardan 100% himoya (1 martalik).", 2000, 4, 1),
 ]
 
@@ -1172,6 +1180,42 @@ class Database:
         await self.update_balance(from_user_id, pul_diff=-amount)
         await self.update_balance(to_user_id, pul_diff=amount)
         return {"success": True, "amount": amount}
+
+    async def transfer_almaz(self, from_user_id: int, to_user_id: int, amount: int) -> Dict[str, Any]:
+        if amount <= 0:
+            return {"success": False, "error": "Miqdor 0 dan katta bo'lishi kerak!"}
+        if from_user_id == to_user_id:
+            return {"success": False, "error": "O'zingizga almaz o'tkaza olmaysiz!"}
+
+        from_u = await self.get_user(from_user_id)
+        if not from_u or from_u.get("almaz", 0) < amount:
+            return {"success": False, "error": "Almazlaringiz yetarli emas!"}
+
+        to_u = await self.get_user(to_user_id)
+        if not to_u:
+            return {"success": False, "error": "Qabul qiluvchi foydalanuvchi botda ro'yxatdan o'tmagan!"}
+
+        await self.update_balance(from_user_id, almaz_diff=-amount)
+        await self.update_balance(to_user_id, almaz_diff=amount)
+        return {"success": True, "amount": amount}
+
+    async def transfer_item(self, from_user_id: int, to_user_id: int, item_code: str, quantity: int = 1) -> Dict[str, Any]:
+        if from_user_id == to_user_id:
+            return {"success": False, "error": "O'zingizga sovg'a qila olmaysiz!"}
+
+        inv = await self.get_inventory(from_user_id)
+        has_item = any(it["code"] == item_code and it["quantity"] >= quantity for it in inv)
+        if not has_item:
+            return {"success": False, "error": "Sizda ushbu mashina / buyum mavjud emas!"}
+
+        to_u = await self.get_user(to_user_id)
+        if not to_u:
+            return {"success": False, "error": "Qabul qiluvchi foydalanuvchi botda ro'yxatdan o'tmagan!"}
+
+        item_info = await self.get_item(item_code)
+        await self.consume_inventory_item(from_user_id, item_code, quantity)
+        await self.add_inventory_item(to_user_id, item_code, quantity)
+        return {"success": True, "item": item_info}
 
     async def bank_deposit(self, user_id: int, amount: int) -> Dict[str, Any]:
         if amount <= 0:

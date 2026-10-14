@@ -68,39 +68,22 @@ async def start_game_cmd(message: Message):
     existing_room = game_manager.get_room(chat_id)
 
     if existing_room:
-        if existing_room.state != "LOBBY":
+        if existing_room.state == "LOBBY":
+            rem_needed = max(0, MIN_PLAYERS - len(existing_room.players))
+            needed_text = f" Yana <b>{rem_needed} ta</b> o'yinchi kerak." if rem_needed > 0 else " O'yin boshlanishga tayyor!"
+            await message.reply(
+                f"⚠️ <b>Guruhda ro'yxatdan o'tish allaqachon ketmoqda!</b>\n\n"
+                f"👥 Ro'yxatdagi o'yinchilar: <b>{len(existing_room.players)} ta</b>.{needed_text}\n\n"
+                f"<i>Guruhda bir vaqtda faqat 1 ta o'yin bo'lishi mumkin. O'yinga qo'shilish uchun asosiy ro'yxatdan o'tish xabaridagi <b>'🤵 Qo'shilish'</b> tugmasini bosing!</i>",
+                parse_mode="HTML"
+            )
+            return
+        else:
             await message.reply(
                 "⚠️ <b>Guruhda ayni paytda o'yin davom etmoqda!</b>\nO'yin tugashini kuting.",
                 parse_mode="HTML"
             )
             return
-        else:
-            can_start = await check_admin_permission(message.bot, chat_id, message.from_user.id, existing_room.creator_id)
-            if can_start and len(existing_room.players) >= MIN_PLAYERS:
-                if existing_room.lobby_task and not existing_room.lobby_task.done():
-                    existing_room.lobby_task.cancel()
-                await message.answer("🚀 <b>O'yin boshlanmoqda! Rollar taqsimlanmoqda...</b>", parse_mode="HTML")
-                await existing_room.start_game()
-                return
-            else:
-                bot_info = await message.bot.get_me()
-                kb = get_lobby_keyboard(chat_id, bot_info.username)
-                rem_needed = max(0, MIN_PLAYERS - len(existing_room.players))
-                warn_text = (
-                    f"⚠️ <b>Ro'yxatdan o'tish allaqachon ketmoqda!</b>\n\n"
-                    f"👥 Hozirda <b>{len(existing_room.players)} ta</b> o'yinchi ro'yxatda.\n"
-                )
-                if rem_needed > 0:
-                    warn_text += (
-                        f"O'yinni boshlash uchun yana <b>{rem_needed} ta</b> o'yinchi kerak.\n"
-                        f"<i>(O'yinchi yetishmasa, pastdagi '🤖 +Bot qo'shish' tugmasini bosishingiz mumkin)</i>\n\n"
-                    )
-                else:
-                    warn_text += "O'yin boshlanishga tayyor! <b>'🚀 O'yinni boshlash'</b> tugmasini bosing!\n\n"
-
-                warn_text += "👇 <i>Quyidagi tugmalardan foydalaning:</i>"
-                await message.reply(warn_text, reply_markup=kb, parse_mode="HTML")
-                return
 
     # Check if user is banned
     user = await db.get_or_create_user(message.from_user.id, message.from_user.username or "", message.from_user.full_name or "")
@@ -381,6 +364,25 @@ async def cmd_skip_talk_to_vote(message: Message):
     if hasattr(room, "talk_event") and room.talk_event and not room.talk_event.is_set():
         room.talk_event.set()
         await message.answer("⚖️ <b>Muhokama to'xtatildi, ovoz berish boshlanmoqda!</b>")
+
+@router.callback_query(F.data.startswith("early_vote_"))
+async def handle_early_vote_callback(call: CallbackQuery):
+    chat_id = int(call.data.replace("early_vote_", ""))
+    room = game_manager.get_room(chat_id)
+    if not room or room.state != "DAY_TALK":
+        await call.answer("❌ Hozir muhokama bosqichida emassiz!", show_alert=True)
+        return
+
+    player = room.get_player(call.from_user.id)
+    if not player or not player.is_alive:
+        await call.answer("❌ Faqat tirik o'yinchilar sudni boshlashi mumkin!", show_alert=True)
+        return
+
+    if hasattr(room, "talk_event") and room.talk_event and not room.talk_event.is_set():
+        room.talk_event.set()
+        await call.answer("⚖️ Ovoz berish boshlandi!")
+    else:
+        await call.answer("Ovoz berishga o'tilmoqda...")
 
 @router.callback_query(F.data.startswith("addbot_"))
 async def handle_add_bot(call: CallbackQuery):

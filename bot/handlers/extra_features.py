@@ -488,9 +488,11 @@ async def show_group_settings(message: Message):
     )
 
 # ==============================================================================
-# 11. PUL O'TKAZISH (/pay <miqdor> yoki /pay @user <miqdor>)
+# 11. PUL VA ALMAZ O'TKAZISH (/pay, /payalmaz)
 # ==============================================================================
 @router.message(Command("pay"))
+@router.message(Command("givemoney"))
+@router.message(Command("pulber"))
 async def handle_pay(message: Message):
     args = message.text.split()
     target_id = None
@@ -513,7 +515,7 @@ async def handle_pay(message: Message):
 
     if not target_id or amount <= 0:
         await message.answer(
-            "💸 <b>Pul o'tkazish uchun:</b>\n"
+            "💸 <b>Pul o'tkazish (sovg'a qilish) uchun:</b>\n"
             "1. Foydalanuvchi xabariga javob berib (reply): <code>/pay 1000</code>\n"
             "2. Yoki: <code>/pay @username 1000</code> deb yuboring."
         )
@@ -525,10 +527,58 @@ async def handle_pay(message: Message):
         return
 
     await message.answer(
-        f"✅ <b>MUVAFFAQIYATLI O'TKAZILDI!</b>\n\n"
-        f"👤 <b>Yuboruvchi:</b> {message.from_user.full_name}\n"
+        f"🎁 <b>MUVAFFAQIYATLI O'TKAZDINGIZ!</b>\n\n"
+        f"👤 <b>O'tkazuvchi:</b> {message.from_user.full_name}\n"
         f"🎯 <b>Qabul qiluvchi:</b> {target_name}\n"
-        f"💰 <b>Miqdor:</b> {amount:,} Pul"
+        f"💰 <b>O'tkazilgan mablag':</b> {amount:,} Pul\n\n"
+        f"<i>Hisoblar muvaffaqiyatli yangilandi!</i>",
+        parse_mode="HTML"
+    )
+
+@router.message(Command("payalmaz"))
+@router.message(Command("pay_almaz"))
+@router.message(Command("givealmaz"))
+@router.message(Command("almazber"))
+async def handle_pay_almaz(message: Message):
+    args = message.text.split()
+    target_id = None
+    target_name = ""
+    amount = 0
+
+    if message.reply_to_message and not message.reply_to_message.from_user.is_bot:
+        target_id = message.reply_to_message.from_user.id
+        target_name = message.reply_to_message.from_user.full_name
+        if len(args) > 1 and args[1].isdigit():
+            amount = int(args[1])
+    elif len(args) >= 3:
+        target_user = args[1].replace("@", "").strip()
+        if args[2].isdigit():
+            amount = int(args[2])
+        u = await db.get_user_by_username(target_user)
+        if u:
+            target_id = u["id"]
+            target_name = u["full_name"]
+
+    if not target_id or amount <= 0:
+        await message.answer(
+            "💎 <b>Almaz o'tkazish (sovg'a qilish) uchun:</b>\n"
+            "1. Foydalanuvchi xabariga javob berib (reply): <code>/payalmaz 5</code>\n"
+            "2. Yoki: <code>/payalmaz @username 5</code> deb yuboring."
+        )
+        return
+
+    res = await db.transfer_almaz(message.from_user.id, target_id, amount)
+    if not res["success"]:
+        await message.answer(f"❌ {res['error']}")
+        return
+
+    await message.answer(
+        f"🎁 <b>MUVAFFAQIYATLI O'TKAZDINGIZ!</b>\n\n"
+        f"👤 <b>O'tkazuvchi:</b> {message.from_user.full_name}\n"
+        f"🎯 <b>Qabul qiluvchi:</b> {target_name}\n"
+        f"💎 <b>O'tkazilgan almaz:</b> {amount:,} Almaz\n\n"
+        f"<i>Hisoblar muvaffaqiyatli yangilandi!</i>",
+        parse_mode="HTML"
     )
 
 # ==============================================================================
@@ -578,7 +628,20 @@ async def handle_bank(message: Message):
 # 13. NIKOH VA OILA TIZIMI (/marry, /divorce)
 # ==============================================================================
 @router.message(Command("marry"))
+@router.message(Command("turmush"))
+@router.message(Command("nikoh"))
 async def handle_marry_proposal(message: Message):
+    # Check if already married
+    m1 = await db.get_marriage(message.from_user.id)
+    if m1 and m1.get("spouse"):
+        await message.answer(
+            f"💍 <b>SIZ ALLAQACHON OILALISIZ!</b>\n\n"
+            f"❤️ <b>Turmush o'rtog'ingiz:</b> {m1['spouse']['full_name']}\n"
+            f"📅 <b>Nikoh sanasi:</b> {m1.get('wedding_date', 'Noma\'lum')}\n\n"
+            f"<i>Ajrashish uchun: /divorce (yoki /ajrashish)</i>"
+        )
+        return
+
     target_id = None
     target_name = ""
 
@@ -594,29 +657,32 @@ async def handle_marry_proposal(message: Message):
                 target_name = u["full_name"]
 
     if not target_id:
-        await message.answer("💍 <b>Turmush qurish uchun:</b>\nSevgan insoningizning xabariga reply qilib <code>/marry</code> deb yozing!")
+        await message.answer(
+            "💍 <b>Turmush qurish uchun:</b>\n"
+            "Sevgan insoningizning xabariga reply (javob) qilib <code>/marry</code> deb yozing!\n"
+            "<i>(Nikoh uzugi yoki 5,000 Pul kerak bo'ladi)</i>"
+        )
         return
 
     if target_id == message.from_user.id:
         await message.answer("⚠️ O'zingizga turmushga chiqa olmaysiz!")
         return
 
-    # Check if sender has ring
-    inv = await db.get_inventory(message.from_user.id)
-    has_ring = any(it["code"] == "nikoh_uzuk" and it["quantity"] > 0 for it in inv)
-    if not has_ring:
-        await message.answer("💍 <b>Turmush qurish uchun do'kondan 'Oltin Nikoh Uzugi' kerak!</b>\nUni 🛍️ Do'kondan xarid qiling.")
-        return
-
-    # Check existing marriage
-    m1 = await db.get_marriage(message.from_user.id)
-    if m1:
-        await message.answer("⚠️ Siz allaqachon oilali insonsiz! Avval <code>/divorce</code> qiling.")
-        return
-
     m2 = await db.get_marriage(target_id)
     if m2:
         await message.answer("⚠️ Bu inson allaqachon boshqa birov bilan oila qurgan!")
+        return
+
+    sender = await db.get_user(message.from_user.id)
+    inv = await db.get_inventory(message.from_user.id)
+    has_ring = any(it["code"] == "nikoh_uzuk" and it["quantity"] > 0 for it in inv)
+    has_cash = sender and sender.get("pul", 0) >= 5000
+
+    if not has_ring and not has_cash:
+        await message.answer(
+            "💍 <b>Turmush qurish uchun 'Oltin Nikoh Uzugi' yoki kamida 5,000 Pul kerak!</b>\n"
+            "Uzukni 🛍️ Do'kondan xarid qilishingiz yoki balansingizda 5,000 Pul to'plashingiz mumkin."
+        )
         return
 
     kb = InlineKeyboardMarkup(inline_keyboard=[
@@ -628,8 +694,8 @@ async def handle_marry_proposal(message: Message):
 
     await message.answer(
         f"💖 <b>SEVGI IZHORI VA NIKOH TAKLIFI!</b> 💖\n\n"
-        f"👤 <b>{message.from_user.full_name}</b>, sizga, <b>{target_name}</b>ga turmush qurish taklifini bildirdi!\n\n"
-        f"<i>Rozimisiz?</i>",
+        f"👤 <b>{message.from_user.full_name}</b> sizga, <b>{target_name}</b>ga turmush qurish taklifini bildirdi!\n\n"
+        f"<i>Rozimisiz? Pastdagi tugmani bosing:</i>",
         reply_markup=kb,
         parse_mode="HTML"
     )
@@ -649,8 +715,18 @@ async def process_marry_answer(call: CallbackQuery):
         await call.message.edit_text("💔 <b>Afsus, nikoh taklifi rad etildi.</b>", parse_mode="HTML")
         return
 
-    # Consume ring
-    await db.consume_inventory_item(proposer_id, "nikoh_uzuk", 1)
+    inv = await db.get_inventory(proposer_id)
+    has_ring = any(it["code"] == "nikoh_uzuk" and it["quantity"] > 0 for it in inv)
+    if has_ring:
+        await db.consume_inventory_item(proposer_id, "nikoh_uzuk", 1)
+    else:
+        proposer_u = await db.get_user(proposer_id)
+        if proposer_u and proposer_u.get("pul", 0) >= 5000:
+            await db.update_balance(proposer_id, pul_diff=-5000)
+        else:
+            await call.message.edit_text("❌ <b>Nikoh to'xtatildi!</b> Kuyovda uzuk yoki 5,000 Pul qolmagan.", parse_mode="HTML")
+            return
+
     await db.marry_users(proposer_id, target_id)
 
     proposer = await db.get_user(proposer_id)
@@ -661,15 +737,16 @@ async def process_marry_answer(call: CallbackQuery):
         f"🎉💍 <b>TO'Y TABRIKLARI! YANGI OILA VUJUDGA KELDI!</b> 💍🎉\n\n"
         f"🤵 <b>Kuyov:</b> {p_name}\n"
         f"👰 <b>Kelin:</b> {t_name}\n\n"
-        f"✨ <i>Birgalikda o'ynaganda qo'shimcha baxtli oila bonusi beriladi!</i>",
+        f"✨ <i>Ikkalangiz ham baxtli bo'ling! Birgalikda o'ynaganda qo'shimcha baxtli oila bonusi beriladi!</i>",
         parse_mode="HTML"
     )
 
 @router.message(Command("divorce"))
+@router.message(Command("ajrashish"))
 async def handle_divorce(message: Message):
     m = await db.get_marriage(message.from_user.id)
     if not m:
-        await message.answer("⚠️ Siz oila qurmaysiz.")
+        await message.answer("⚠️ Siz hali oila qurmaysiz. Turmush qurish uchun: <code>/marry</code>")
         return
 
     await db.divorce_users(message.from_user.id)
@@ -782,35 +859,164 @@ async def handle_reputation(message: Message):
     )
 
 # ==============================================================================
-# 16. GARAJ VA MAFIA MASHINALARI (/garage)
+# 16. GARAJ VA MAFIA MASHINALARI (/garage, /givecar)
 # ==============================================================================
+CAR_DEFINITIONS = [
+    ("mashina_rolls", "👑 Rolls-Royce Phantom ('Don Karleone')", "50% suiqasddan qochish"),
+    ("mashina_porsche", "🏎️ Porsche 911 Turbo S", "40% suiqasddan qochish"),
+    ("mashina_gelik", "🚙 Mercedes-Benz G63 ('Gelik')", "35% suiqasddan qochish"),
+    ("mashina_bmw", "🏎️ BMW M5 F90", "30% suiqasddan qochish"),
+    ("mashina_malibu", "🚔 Chevrolet Malibu 2 ('Black')", "25% suiqasddan qochish"),
+    ("mashina_kaban", "🚘 Mercedes W140 ('Kaban')", "20% suiqasddan qochish"),
+    ("mashina_monza", "🚗 Chevrolet Monza", "18% suiqasddan qochish"),
+    ("mashina_gentra", "🚙 Chevrolet Gentra ('Qora Gentra')", "15% suiqasddan qochish"),
+    ("mashina_nexia", "🚙 Daewoo Nexia 2 ('Xalqona')", "12% suiqasddan qochish"),
+    ("mashina_matiz", "🚗 Daewoo Matiz ('Tezkor')", "10% suiqasddan qochish"),
+]
+
 @router.message(Command("garage"))
+@router.message(Command("garaj"))
+@router.message(Command("mashinalar"))
 async def show_garage(message: Message):
     inv = await db.get_inventory(message.from_user.id)
     inv_map = {it["code"]: it["quantity"] for it in inv}
 
-    has_kaban = inv_map.get("mashina_kaban", 0) > 0
-    has_bmw = inv_map.get("mashina_bmw", 0) > 0
-
     cars_txt = []
-    if has_kaban:
-        cars_txt.append("🚘 <b>Mercedes W140 ('Kaban')</b> — <i>Tungi suiqasddan 20% qochish imkoniyati</i>")
-    if has_bmw:
-        cars_txt.append("🏎️ <b>BMW M5 F90</b> — <i>Tungi suiqasddan 30% qochish imkoniyati</i>")
+    for code, title, stat in CAR_DEFINITIONS:
+        cnt = inv_map.get(code, 0)
+        if cnt > 0:
+            cars_txt.append(f"• <b>{title}</b> ({cnt} ta) — <i>{stat}</i>")
 
     if not cars_txt:
         await message.answer(
-            "🚗 <b>SIZNING GARAJIYINGIZ BO'SH</b>\n\n"
+            "🚗 <b>SIZNING GARAJIYINGIZ BO'SH!</b>\n\n"
             "Sizda hali mashina yo'q. Mashinalar kechasi mafiya yoki qotil hujumidan **qochib qolish** imkonini beradi!\n\n"
-            "<i>Mashinalarni 🛍️ Do'kondan xarid qilishingiz mumkin.</i>"
+            "<i>Mashinalarni 🛍️ Do'kondan xarid qilishingiz yoki do'stlaringizdan sovg'a olishingiz mumkin.</i>"
         )
         return
 
     await message.answer(
         f"🚗 <b>SIZNING MAFIYA GARAJIYINGIZ:</b>\n\n" +
         "\n".join(cars_txt) +
-        "\n\n✨ <i>Ushbu avtomobillar o'yinda passiv himoya sifatida avtomatik ishlaydi!</i>"
+        "\n\n✨ <i>Ushbu avtomobillar o'yinda passiv himoya sifatida avtomatik ishlaydi!</i>\n"
+        "🎁 <i>Do'stingizga mashina sovg'a qilish uchun uning xabariga reply qilib <code>/givecar</code> deb yozing!</i>",
+        parse_mode="HTML"
     )
+
+@router.message(Command("givecar"))
+@router.message(Command("giftcar"))
+@router.message(Command("moshinasovga"))
+async def handle_give_car(message: Message):
+    target_id = None
+    target_name = ""
+
+    if message.reply_to_message and not message.reply_to_message.from_user.is_bot:
+        target_id = message.reply_to_message.from_user.id
+        target_name = message.reply_to_message.from_user.full_name
+    else:
+        args = message.text.split()
+        if len(args) > 1 and args[1].startswith("@"):
+            u = await db.get_user_by_username(args[1])
+            if u:
+                target_id = u["id"]
+                target_name = u["full_name"]
+
+    if not target_id:
+        await message.answer(
+            "🎁 <b>Mashina sovg'a qilish uchun:</b>\n"
+            "1. Foydalanuvchi xabariga javob berib (reply): <code>/givecar</code>\n"
+            "2. Yoki: <code>/givecar @username</code> deb yuboring."
+        )
+        return
+
+    if target_id == message.from_user.id:
+        await message.answer("⚠️ O'zingizga mashina sovg'a qila olmaysiz!")
+        return
+
+    inv = await db.get_inventory(message.from_user.id)
+    inv_map = {it["code"]: it for it in inv if it["code"].startswith("mashina_") and it["quantity"] > 0}
+
+    if not inv_map:
+        await message.answer("❌ <b>Sizda sovg'a qilish uchun birorta ham mashina yo'q!</b>\nAvval 🛍️ Do'kondan mashina xarid qiling.")
+        return
+
+    # Check if a specific car was named in command
+    args = message.text.split()
+    chosen_car_code = None
+    if len(args) > 1 and not args[1].startswith("@"):
+        query = args[1].lower()
+        for code in inv_map:
+            if query in code:
+                chosen_car_code = code
+                break
+    elif len(args) > 2 and args[1].startswith("@"):
+        query = args[2].lower()
+        for code in inv_map:
+            if query in code:
+                chosen_car_code = code
+                break
+
+    if chosen_car_code:
+        res = await db.transfer_item(message.from_user.id, target_id, chosen_car_code, 1)
+        if not res["success"]:
+            await message.answer(f"❌ {res['error']}")
+            return
+
+        car_name = inv_map[chosen_car_code]["name"]
+        await message.answer(
+            f"🎁 <b>MUVAFFAQIYATLI O'TKAZDINGIZ!</b>\n\n"
+            f"👤 <b>O'tkazuvchi:</b> {message.from_user.full_name}\n"
+            f"🎯 <b>Qabul qiluvchi:</b> {target_name}\n"
+            f"🚘 <b>Sovg'a qilingan mashina:</b> {car_name}!\n\n"
+            f"<i>Yangi egasi o'z garajida ko'rishi mumkin (/garage)!</i>",
+            parse_mode="HTML"
+        )
+        return
+
+    # If no specific car specified, show inline keyboard with user's available cars
+    buttons = []
+    for code, it in inv_map.items():
+        buttons.append([
+            InlineKeyboardButton(
+                text=f"{it['name']} ({it['quantity']} ta)",
+                callback_data=f"givecar_{target_id}_{code}"
+            )
+        ])
+
+    kb = InlineKeyboardMarkup(inline_keyboard=buttons)
+    await message.answer(
+        f"🎁 <b>{target_name} ga qaysi mashinangizni sovg'a qilmoqchisiz?</b>\nPastdan birini tanlang:",
+        reply_markup=kb,
+        parse_mode="HTML"
+    )
+
+@router.callback_query(F.data.startswith("givecar_"))
+async def process_give_car_callback(call: CallbackQuery):
+    parts = call.data.split("_")
+    target_id = int(parts[1])
+    car_code = "_".join(parts[2:])
+
+    sender_id = call.from_user.id
+    target_u = await db.get_user(target_id)
+    target_name = target_u["full_name"] if target_u else "Foydalanuvchi"
+
+    res = await db.transfer_item(sender_id, target_id, car_code, 1)
+    if not res["success"]:
+        await call.answer(f"❌ {res['error']}", show_alert=True)
+        return
+
+    item_info = await db.get_item(car_code)
+    car_name = item_info["name"] if item_info else car_code
+
+    await call.message.edit_text(
+        f"🎁 <b>MUVAFFAQIYATLI O'TKAZDINGIZ!</b>\n\n"
+        f"👤 <b>O'tkazuvchi:</b> {call.from_user.full_name}\n"
+        f"🎯 <b>Qabul qiluvchi:</b> {target_name}\n"
+        f"🚘 <b>Sovg'a qilingan mashina:</b> {car_name}!\n\n"
+        f"<i>Yangi egasi o'z garajida ko'rishi mumkin (/garage)!</i>",
+        parse_mode="HTML"
+    )
+    await call.answer("✅ Mashina muvaffaqiyatli sovg'a qilindi!")
 
 # ==============================================================================
 # 17. OMAD CHARXPALAGI (/spin)

@@ -513,6 +513,29 @@ class GameRoom:
                 await self.send_dm(vid, "🎲 <b>Omadli tanga tufayli suiqasddan mo'jizaviy qutulib qoldingiz!</b>")
                 continue
 
+            # Mashinalar orqali suiqasddan qochish ehtimoli
+            car_rates = [
+                ("mashina_rolls", 0.50, "👑 Rolls-Royce Phantom"),
+                ("mashina_porsche", 0.40, "🏎️ Porsche 911"),
+                ("mashina_gelik", 0.35, "🚙 Mercedes Gelik"),
+                ("mashina_bmw", 0.30, "🏎️ BMW M5 F90"),
+                ("mashina_malibu", 0.25, "🚔 Chevrolet Malibu 2"),
+                ("mashina_kaban", 0.20, "🚘 Mercedes W140 ('Kaban')"),
+                ("mashina_monza", 0.18, "🚗 Chevrolet Monza"),
+                ("mashina_gentra", 0.15, "🚙 Chevrolet Gentra"),
+                ("mashina_nexia", 0.12, "🚙 Daewoo Nexia 2"),
+                ("mashina_matiz", 0.10, "🚗 Daewoo Matiz"),
+            ]
+            car_escaped = False
+            for car_code, chance, car_title in car_rates:
+                if any(it["code"] == car_code and it["quantity"] > 0 for it in inv):
+                    if random.random() < chance:
+                        await self.send_dm(vid, f"🏎️ <b>{car_title} mashinangizda gazni bosib, tungi suiqasddan qochib qoldingiz!</b>")
+                        car_escaped = True
+                        break
+            if car_escaped:
+                continue
+
             victim.is_alive = False
             actually_killed.append(victim)
 
@@ -553,8 +576,8 @@ class GameRoom:
         morning_msg += "\n".join([f"• {p.tag}" for p in alive])
 
         settings = await db.get_group_settings(self.chat_id)
-        talk_time = settings.get("talk_time", DAY_TALK_TIMEOUT)
-        morning_msg += f"\n\n💬 <b>Muhokama vaqti:</b> {talk_time} soniya.\n<i>(Muhokamani yakunlab tezroq sudga o'tish uchun: /vote)</i>"
+        talk_time = min(25, settings.get("talk_time", DAY_TALK_TIMEOUT))
+        morning_msg += f"\n\n💬 <b>Tonggi muhokama:</b> {talk_time} soniya.\n<i>(Shundan so'ng shahar sudi (ovoz berish) o'zi avtomatik boshlanadi!)</i>"
         # Kunduzi guruh a'zolariga yozishga ruxsat beriladi (Unmute)
         if self.chat_id < 0:
             try:
@@ -569,7 +592,10 @@ class GameRoom:
             except Exception:
                 pass
 
-        await self.broadcast_group(morning_msg)
+        early_vote_kb = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="⚖️ Ovoz berishni darhol boshlash", callback_data=f"early_vote_{self.chat_id}")]
+        ])
+        await self.broadcast_group(morning_msg, reply_markup=early_vote_kb)
 
         # Broadcast Last Will if any killed player left one!
         if night_killed:
