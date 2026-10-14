@@ -27,6 +27,7 @@ from bot.handlers import (
     card_router,
     extra_features_router
 )
+from bot.handlers.group_game import GameFilterMiddleware
 from web.app import app as web_app
 
 # Configure logging
@@ -65,6 +66,7 @@ async def run_bot():
         default=DefaultBotProperties(parse_mode=ParseMode.HTML)
     )
     dp = Dispatcher()
+    dp.message.middleware(GameFilterMiddleware())
 
     # Register handlers
     dp.include_router(start_router)

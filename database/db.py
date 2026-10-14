@@ -1169,13 +1169,12 @@ class Database:
         if from_user_id == to_user_id:
             return {"success": False, "error": "O'zingizga pul o'tkaza olmaysiz!"}
 
-        from_u = await self.get_user(from_user_id)
+        from_u = await self.get_or_create_user(from_user_id)
         if not from_u or from_u.get("pul", 0) < amount:
-            return {"success": False, "error": "Mablag' yetarli emas!"}
+            curr_pul = from_u.get("pul", 0) if from_u else 0
+            return {"success": False, "error": f"Mablag' yetarli emas! Sizning balansingizda: {curr_pul:,} Pul mavjud."}
 
-        to_u = await self.get_user(to_user_id)
-        if not to_u:
-            return {"success": False, "error": "Qabul qiluvchi foydalanuvchi botda ro'yxatdan o'tmagan!"}
+        to_u = await self.get_or_create_user(to_user_id)
 
         await self.update_balance(from_user_id, pul_diff=-amount)
         await self.update_balance(to_user_id, pul_diff=amount)
@@ -1187,13 +1186,12 @@ class Database:
         if from_user_id == to_user_id:
             return {"success": False, "error": "O'zingizga almaz o'tkaza olmaysiz!"}
 
-        from_u = await self.get_user(from_user_id)
+        from_u = await self.get_or_create_user(from_user_id)
         if not from_u or from_u.get("almaz", 0) < amount:
-            return {"success": False, "error": "Almazlaringiz yetarli emas!"}
+            curr_almaz = from_u.get("almaz", 0) if from_u else 0
+            return {"success": False, "error": f"Almazlaringiz yetarli emas! Sizda: {curr_almaz:,} Almaz bor."}
 
-        to_u = await self.get_user(to_user_id)
-        if not to_u:
-            return {"success": False, "error": "Qabul qiluvchi foydalanuvchi botda ro'yxatdan o'tmagan!"}
+        to_u = await self.get_or_create_user(to_user_id)
 
         await self.update_balance(from_user_id, almaz_diff=-amount)
         await self.update_balance(to_user_id, almaz_diff=amount)
@@ -1208,9 +1206,7 @@ class Database:
         if not has_item:
             return {"success": False, "error": "Sizda ushbu mashina / buyum mavjud emas!"}
 
-        to_u = await self.get_user(to_user_id)
-        if not to_u:
-            return {"success": False, "error": "Qabul qiluvchi foydalanuvchi botda ro'yxatdan o'tmagan!"}
+        to_u = await self.get_or_create_user(to_user_id)
 
         item_info = await self.get_item(item_code)
         await self.consume_inventory_item(from_user_id, item_code, quantity)
@@ -1261,13 +1257,16 @@ class Database:
                 m = dict(row)
                 spouse_id = m["user2_id"] if m["user1_id"] == user_id else m["user1_id"]
                 spouse = await self.get_user(spouse_id)
-                m["spouse"] = spouse
+                m["spouse"] = spouse or {"id": spouse_id, "full_name": "Turmush o'rtog'i"}
                 return m
 
     async def marry_users(self, user1_id: int, user2_id: int) -> bool:
+        await self.get_or_create_user(user1_id)
+        await self.get_or_create_user(user2_id)
         async with aiosqlite.connect(self.db_path) as db:
+            await db.execute("DELETE FROM marriages WHERE user1_id IN (?, ?) OR user2_id IN (?, ?);", (user1_id, user2_id, user1_id, user2_id))
             await db.execute("""
-                INSERT OR REPLACE INTO marriages (user1_id, user2_id) VALUES (?, ?);
+                INSERT INTO marriages (user1_id, user2_id) VALUES (?, ?);
             """, (user1_id, user2_id))
             await db.execute("UPDATE users SET spouse_id = ? WHERE id = ?;", (user2_id, user1_id))
             await db.execute("UPDATE users SET spouse_id = ? WHERE id = ?;", (user1_id, user2_id))
@@ -1275,12 +1274,9 @@ class Database:
             return True
 
     async def divorce_users(self, user_id: int) -> bool:
-        m = await self.get_marriage(user_id)
-        if not m:
-            return False
         async with aiosqlite.connect(self.db_path) as db:
-            await db.execute("DELETE FROM marriages WHERE id = ?;", (m["id"],))
-            await db.execute("UPDATE users SET spouse_id = 0 WHERE id IN (?, ?);", (m["user1_id"], m["user2_id"]))
+            await db.execute("DELETE FROM marriages WHERE user1_id = ? OR user2_id = ?;", (user_id, user_id))
+            await db.execute("UPDATE users SET spouse_id = 0 WHERE id = ? OR spouse_id = ?;", (user_id, user_id))
             await db.commit()
             return True
 

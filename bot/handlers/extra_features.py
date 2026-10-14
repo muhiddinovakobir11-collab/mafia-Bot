@@ -488,37 +488,84 @@ async def show_group_settings(message: Message):
     )
 
 # ==============================================================================
-# 11. PUL VA ALMAZ O'TKAZISH (/pay, /payalmaz)
+# 11. PUL VA ALMAZ O'TKAZISH (/pay, /otkazish, /payalmaz)
 # ==============================================================================
-@router.message(Command("pay"))
-@router.message(Command("givemoney"))
-@router.message(Command("pulber"))
-async def handle_pay(message: Message):
-    args = message.text.split()
+async def extract_transfer_target_and_amount(message: Message):
     target_id = None
     target_name = ""
     amount = 0
 
-    if message.reply_to_message and not message.reply_to_message.from_user.is_bot:
-        target_id = message.reply_to_message.from_user.id
-        target_name = message.reply_to_message.from_user.full_name
-        if len(args) > 1 and args[1].isdigit():
-            amount = int(args[1])
-    elif len(args) >= 3:
-        target_user = args[1].replace("@", "").strip()
-        if args[2].isdigit():
-            amount = int(args[2])
-        u = await db.get_user_by_username(target_user)
-        if u:
-            target_id = u["id"]
-            target_name = u["full_name"]
+    text = message.text or message.caption or ""
+    tokens = text.split()
 
-    if not target_id or amount <= 0:
+    # 1. First priority: reply_to_message
+    if message.reply_to_message and message.reply_to_message.from_user:
+        if not message.reply_to_message.from_user.is_bot:
+            target_id = message.reply_to_message.from_user.id
+            target_name = message.reply_to_message.from_user.full_name
+            # Find the first positive number anywhere in tokens
+            for t in tokens:
+                clean_t = t.replace(",", "").replace(".", "").replace("pul", "").replace("almaz", "").strip()
+                if clean_t.isdigit() and int(clean_t) > 0:
+                    amount = int(clean_t)
+                    break
+            return target_id, target_name, amount
+
+    # 2. Second priority: mentions in text or entities
+    if message.entities:
+        for ent in message.entities:
+            if ent.type == "text_mention" and ent.user:
+                if not ent.user.is_bot:
+                    target_id = ent.user.id
+                    target_name = ent.user.full_name
+                    break
+            elif ent.type == "mention":
+                uname = text[ent.offset:ent.offset + ent.length].replace("@", "").strip()
+                u = await db.get_user_by_username(uname)
+                if u:
+                    target_id = u["id"]
+                    target_name = u["full_name"]
+                    break
+
+    # Check for @username in tokens if not yet found
+    if not target_id:
+        for t in tokens:
+            if t.startswith("@"):
+                u = await db.get_user_by_username(t.replace("@", "").strip())
+                if u:
+                    target_id = u["id"]
+                    target_name = u["full_name"]
+                    break
+
+    # Find the amount in tokens
+    for t in tokens:
+        clean_t = t.replace(",", "").replace(".", "").replace("pul", "").replace("almaz", "").strip()
+        if clean_t.isdigit() and int(clean_t) > 0:
+            amount = int(clean_t)
+            break
+
+    return target_id, target_name, amount
+
+@router.message(Command("pay", "otkazish", "otkaz", "utkazish", "pulber", "givemoney", "send", "transfer", "perevod", "pul"))
+@router.message(F.text.lower().startswith(("otkazish", "o'tkazish", "pul otkazish", "pul o'tkazish", "pul berish", "pay ")))
+async def handle_pay(message: Message):
+    target_id, target_name, amount = await extract_transfer_target_and_amount(message)
+
+    if not target_id:
         await message.answer(
             "💸 <b>Pul o'tkazish (sovg'a qilish) uchun:</b>\n"
-            "1. Foydalanuvchi xabariga javob berib (reply): <code>/pay 1000</code>\n"
-            "2. Yoki: <code>/pay @username 1000</code> deb yuboring."
+            "1. Foydalanuvchi xabariga javob berib (reply): <code>/otkazish 1000</code> (yoki <code>/pay 1000</code>)\n"
+            "2. Yoki: <code>/otkazish @username 1000</code> deb yuboring.",
+            parse_mode="HTML"
         )
+        return
+
+    if target_id == message.from_user.id:
+        await message.answer("⚠️ O'zingizga pul o'tkaza olmaysiz!")
+        return
+
+    if amount <= 0:
+        await message.answer("⚠️ O'tkazmoqchi bo'lgan pul miqdorini yozing!\nMasalan: <code>/otkazish 1000</code>")
         return
 
     res = await db.transfer_pul(message.from_user.id, target_id, amount)
@@ -535,36 +582,26 @@ async def handle_pay(message: Message):
         parse_mode="HTML"
     )
 
-@router.message(Command("payalmaz"))
-@router.message(Command("pay_almaz"))
-@router.message(Command("givealmaz"))
-@router.message(Command("almazber"))
+@router.message(Command("payalmaz", "pay_almaz", "givealmaz", "almazber", "almazotkazish", "almaz_otkazish", "almaz"))
+@router.message(F.text.lower().startswith(("almaz otkazish", "almaz o'tkazish", "almaz berish", "payalmaz ")))
 async def handle_pay_almaz(message: Message):
-    args = message.text.split()
-    target_id = None
-    target_name = ""
-    amount = 0
+    target_id, target_name, amount = await extract_transfer_target_and_amount(message)
 
-    if message.reply_to_message and not message.reply_to_message.from_user.is_bot:
-        target_id = message.reply_to_message.from_user.id
-        target_name = message.reply_to_message.from_user.full_name
-        if len(args) > 1 and args[1].isdigit():
-            amount = int(args[1])
-    elif len(args) >= 3:
-        target_user = args[1].replace("@", "").strip()
-        if args[2].isdigit():
-            amount = int(args[2])
-        u = await db.get_user_by_username(target_user)
-        if u:
-            target_id = u["id"]
-            target_name = u["full_name"]
-
-    if not target_id or amount <= 0:
+    if not target_id:
         await message.answer(
             "💎 <b>Almaz o'tkazish (sovg'a qilish) uchun:</b>\n"
             "1. Foydalanuvchi xabariga javob berib (reply): <code>/payalmaz 5</code>\n"
-            "2. Yoki: <code>/payalmaz @username 5</code> deb yuboring."
+            "2. Yoki: <code>/payalmaz @username 5</code> deb yuboring.",
+            parse_mode="HTML"
         )
+        return
+
+    if target_id == message.from_user.id:
+        await message.answer("⚠️ O'zingizga almaz o'tkaza olmaysiz!")
+        return
+
+    if amount <= 0:
+        await message.answer("⚠️ O'tkazmoqchi bo'lgan almaz miqdorini yozing!\nMasalan: <code>/payalmaz 5</code>")
         return
 
     res = await db.transfer_almaz(message.from_user.id, target_id, amount)
@@ -625,42 +662,54 @@ async def handle_bank(message: Message):
         await message.answer(f"💵 <b>Bankdan yechildi:</b> +{amount:,} Pul!\nCho'ntagingizda: <b>{(pul + amount):,} Pul</b>.")
 
 # ==============================================================================
-# 13. NIKOH VA OILA TIZIMI (/marry, /divorce)
+# 13. NIKOH VA OILA TIZIMI (/marry, /turmush, /divorce)
 # ==============================================================================
-@router.message(Command("marry"))
-@router.message(Command("turmush"))
-@router.message(Command("nikoh"))
-async def handle_marry_proposal(message: Message):
-    # Check if already married
-    m1 = await db.get_marriage(message.from_user.id)
-    if m1 and m1.get("spouse"):
-        await message.answer(
-            f"💍 <b>SIZ ALLAQACHON OILALISIZ!</b>\n\n"
-            f"❤️ <b>Turmush o'rtog'ingiz:</b> {m1['spouse']['full_name']}\n"
-            f"📅 <b>Nikoh sanasi:</b> {m1.get('wedding_date', 'Noma\'lum')}\n\n"
-            f"<i>Ajrashish uchun: /divorce (yoki /ajrashish)</i>"
+async def extract_marry_target(message: Message):
+    if message.reply_to_message and message.reply_to_message.from_user:
+        if message.reply_to_message.from_user.is_bot:
+            return "bot", "", ""
+        return (
+            message.reply_to_message.from_user.id,
+            message.reply_to_message.from_user.full_name,
+            message.reply_to_message.from_user.username or ""
         )
-        return
 
-    target_id = None
-    target_name = ""
+    if message.entities:
+        for ent in message.entities:
+            if ent.type == "text_mention" and ent.user:
+                if ent.user.is_bot:
+                    return "bot", "", ""
+                return ent.user.id, ent.user.full_name, ent.user.username or ""
+            elif ent.type == "mention":
+                uname = (message.text or "")[ent.offset:ent.offset + ent.length].replace("@", "").strip()
+                u = await db.get_user_by_username(uname)
+                if u:
+                    return u["id"], u["full_name"], u.get("username", "")
 
-    if message.reply_to_message and not message.reply_to_message.from_user.is_bot:
-        target_id = message.reply_to_message.from_user.id
-        target_name = message.reply_to_message.from_user.full_name
-    else:
-        args = message.text.split()
-        if len(args) > 1:
-            u = await db.get_user_by_username(args[1])
+    tokens = (message.text or "").split()
+    for t in tokens:
+        if t.startswith("@"):
+            u = await db.get_user_by_username(t.replace("@", "").strip())
             if u:
-                target_id = u["id"]
-                target_name = u["full_name"]
+                return u["id"], u["full_name"], u.get("username", "")
+
+    return None, "", ""
+
+@router.message(Command("marry", "turmush", "nikoh", "uylanish", "uylan", "oilaviy", "svadba"))
+@router.message(F.text.lower().in_(["marry", "turmush", "nikoh", "uylanish", "oilaviy", "/marry", "/turmush", "/nikoh"]))
+async def handle_marry_proposal(message: Message):
+    target_id, target_name, target_username = await extract_marry_target(message)
+
+    if target_id == "bot":
+        await message.answer("🤖 Bot bilan turmush qura olmaysiz!")
+        return
 
     if not target_id:
         await message.answer(
             "💍 <b>Turmush qurish uchun:</b>\n"
-            "Sevgan insoningizning xabariga reply (javob) qilib <code>/marry</code> deb yozing!\n"
-            "<i>(Nikoh uzugi yoki 5,000 Pul kerak bo'ladi)</i>"
+            "1. Sevgan insoningizning xabariga javob berib (reply): <code>/marry</code> (yoki <code>/turmush</code>)\n"
+            "2. Yoki: <code>/marry @username</code> deb yuboring!",
+            parse_mode="HTML"
         )
         return
 
@@ -668,22 +717,29 @@ async def handle_marry_proposal(message: Message):
         await message.answer("⚠️ O'zingizga turmushga chiqa olmaysiz!")
         return
 
-    m2 = await db.get_marriage(target_id)
-    if m2:
-        await message.answer("⚠️ Bu inson allaqachon boshqa birov bilan oila qurgan!")
-        return
-
-    sender = await db.get_user(message.from_user.id)
-    inv = await db.get_inventory(message.from_user.id)
-    has_ring = any(it["code"] == "nikoh_uzuk" and it["quantity"] > 0 for it in inv)
-    has_cash = sender and sender.get("pul", 0) >= 5000
-
-    if not has_ring and not has_cash:
+    # Check if already married
+    m1 = await db.get_marriage(message.from_user.id)
+    if m1 and m1.get("spouse"):
+        spouse_id = m1["spouse"].get("id")
+        if spouse_id == target_id:
+            await message.answer("❤️ Siz allaqachon bir-biringiz bilan oila qurgansiz! Baxtli bo'ling!")
+            return
         await message.answer(
-            "💍 <b>Turmush qurish uchun 'Oltin Nikoh Uzugi' yoki kamida 5,000 Pul kerak!</b>\n"
-            "Uzukni 🛍️ Do'kondan xarid qilishingiz yoki balansingizda 5,000 Pul to'plashingiz mumkin."
+            f"💍 <b>SIZ ALLAQACHON OILALISIZ!</b>\n\n"
+            f"❤️ <b>Turmush o'rtog'ingiz:</b> {m1['spouse'].get('full_name', 'Turmush o\'rtog\'i')}\n\n"
+            f"<i>Yangi nikoh qurish uchun avval <code>/divorce</code> (ajrashish) deb yozing.</i>",
+            parse_mode="HTML"
         )
         return
+
+    m2 = await db.get_marriage(target_id)
+    if m2 and m2.get("spouse"):
+        await message.answer("⚠️ Bu inson allaqachon boshqa birov bilan oila qurgan! Avval u ajrashishi kerak.")
+        return
+
+    # Auto create users so balances and IDs are primed
+    await db.get_or_create_user(message.from_user.id, message.from_user.username or "", message.from_user.full_name or "")
+    await db.get_or_create_user(target_id, target_username, target_name)
 
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [
@@ -715,17 +771,20 @@ async def process_marry_answer(call: CallbackQuery):
         await call.message.edit_text("💔 <b>Afsus, nikoh taklifi rad etildi.</b>", parse_mode="HTML")
         return
 
+    proposer_u = await db.get_or_create_user(proposer_id)
+    await db.get_or_create_user(target_id, call.from_user.username or "", call.from_user.full_name or "")
+
     inv = await db.get_inventory(proposer_id)
     has_ring = any(it["code"] == "nikoh_uzuk" and it["quantity"] > 0 for it in inv)
+    ring_note = ""
     if has_ring:
         await db.consume_inventory_item(proposer_id, "nikoh_uzuk", 1)
+        ring_note = "💍 <i>Oltin nikoh uzugi taqildi!</i>"
+    elif proposer_u.get("pul", 0) >= 500:
+        await db.update_balance(proposer_id, pul_diff=-500)
+        ring_note = "💰 <i>Nikoh rasmiylashtirish uchun 500 Pul to'landi.</i>"
     else:
-        proposer_u = await db.get_user(proposer_id)
-        if proposer_u and proposer_u.get("pul", 0) >= 5000:
-            await db.update_balance(proposer_id, pul_diff=-5000)
-        else:
-            await call.message.edit_text("❌ <b>Nikoh to'xtatildi!</b> Kuyovda uzuk yoki 5,000 Pul qolmagan.", parse_mode="HTML")
-            return
+        ring_note = "💖 <i>Haqiqiy sevgi bebaho! Nikoh bepul rasmiylashtirildi!</i>"
 
     await db.marry_users(proposer_id, target_id)
 
@@ -737,12 +796,13 @@ async def process_marry_answer(call: CallbackQuery):
         f"🎉💍 <b>TO'Y TABRIKLARI! YANGI OILA VUJUDGA KELDI!</b> 💍🎉\n\n"
         f"🤵 <b>Kuyov:</b> {p_name}\n"
         f"👰 <b>Kelin:</b> {t_name}\n\n"
+        f"{ring_note}\n"
         f"✨ <i>Ikkalangiz ham baxtli bo'ling! Birgalikda o'ynaganda qo'shimcha baxtli oila bonusi beriladi!</i>",
         parse_mode="HTML"
     )
+    await call.answer("💍 Tabriklaymiz, nikoh muvaffaqiyatli tuzildi!")
 
-@router.message(Command("divorce"))
-@router.message(Command("ajrashish"))
+@router.message(Command("divorce", "ajrashish", "taloq"))
 async def handle_divorce(message: Message):
     m = await db.get_marriage(message.from_user.id)
     if not m:
@@ -903,9 +963,8 @@ async def show_garage(message: Message):
         parse_mode="HTML"
     )
 
-@router.message(Command("givecar"))
-@router.message(Command("giftcar"))
-@router.message(Command("moshinasovga"))
+@router.message(Command("givecar", "giftcar", "moshinasovga", "mashinasovga", "avtosovga", "moshinaotkazish", "mashinaotkazish"))
+@router.message(F.text.lower().startswith(("moshina sovga", "mashina sovga", "moshina otkazish", "mashina otkazish")))
 async def handle_give_car(message: Message):
     target_id = None
     target_name = ""
@@ -913,13 +972,30 @@ async def handle_give_car(message: Message):
     if message.reply_to_message and not message.reply_to_message.from_user.is_bot:
         target_id = message.reply_to_message.from_user.id
         target_name = message.reply_to_message.from_user.full_name
-    else:
-        args = message.text.split()
-        if len(args) > 1 and args[1].startswith("@"):
-            u = await db.get_user_by_username(args[1])
-            if u:
-                target_id = u["id"]
-                target_name = u["full_name"]
+    elif message.entities:
+        for ent in message.entities:
+            if ent.type == "text_mention" and ent.user:
+                if not ent.user.is_bot:
+                    target_id = ent.user.id
+                    target_name = ent.user.full_name
+                    break
+            elif ent.type == "mention":
+                uname = (message.text or "")[ent.offset:ent.offset + ent.length].replace("@", "").strip()
+                u = await db.get_user_by_username(uname)
+                if u:
+                    target_id = u["id"]
+                    target_name = u["full_name"]
+                    break
+
+    if not target_id:
+        args = message.text.split() if message.text else []
+        for a in args:
+            if a.startswith("@"):
+                u = await db.get_user_by_username(a.replace("@", "").strip())
+                if u:
+                    target_id = u["id"]
+                    target_name = u["full_name"]
+                    break
 
     if not target_id:
         await message.answer(

@@ -1,5 +1,5 @@
 import asyncio
-from aiogram import Router, F
+from aiogram import Router, F, BaseMiddleware
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.filters import Command
 
@@ -545,33 +545,37 @@ async def cmd_game_rules(message: Message):
     )
     await message.answer(rules_text, parse_mode="HTML")
 
-@router.message(F.chat.type.in_(["group", "supergroup"]))
-async def group_messages_filter(message: Message):
-    if not message.from_user:
-        return
-    room = game_manager.get_room(message.chat.id)
-    if not room or room.state in ["LOBBY", "GAME_OVER"]:
-        return
+class GameFilterMiddleware(BaseMiddleware):
+    async def __call__(self, handler, event, data):
+        if not isinstance(event, Message):
+            return await handler(event, data)
 
-    # 1. "Мертвые молчат" rule: Dead players cannot speak during active game!
-    player = room.get_player(message.from_user.id)
-    if player and not player.is_alive:
-        try:
-            await message.delete()
-        except Exception:
-            pass
-        return
+        if event.chat.type not in ["group", "supergroup"] or not event.from_user:
+            return await handler(event, data)
 
-    # 2. Anti-spam URL deletion
-    settings = await db.get_group_settings(message.chat.id)
-    if settings.get("is_antispam") and message.text:
-        text = message.text.lower()
-        if "http://" in text or "https://" in text or "t.me/" in text:
-            is_adm = await check_admin_permission(message.bot, message.chat.id, message.from_user.id, 0)
-            if not is_adm:
+        room = game_manager.get_room(event.chat.id)
+        if room and room.state not in ["LOBBY", "GAME_OVER"]:
+            # 1. "Мертвые молчат" rule: Dead players cannot speak during active game!
+            player = room.get_player(event.from_user.id)
+            if player and not player.is_alive:
                 try:
-                    await message.delete()
+                    await event.delete()
                 except Exception:
                     pass
-                return
+                return None
+
+            # 2. Anti-spam URL deletion
+            settings = await db.get_group_settings(event.chat.id)
+            if settings.get("is_antispam") and event.text:
+                text = event.text.lower()
+                if "http://" in text or "https://" in text or "t.me/" in text:
+                    is_adm = await check_admin_permission(event.bot, event.chat.id, event.from_user.id, 0)
+                    if not is_adm:
+                        try:
+                            await event.delete()
+                        except Exception:
+                            pass
+                        return None
+
+        return await handler(event, data)
 
