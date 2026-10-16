@@ -68,9 +68,39 @@ async def start_game_cmd(message: Message):
     existing_room = game_manager.get_room(chat_id)
 
     if existing_room:
-        if existing_room.state == "LOBBY":
+        if existing_room.state == "GAME_OVER":
+            game_manager.remove_room(chat_id)
+        elif existing_room.state == "LOBBY":
+            # Check if this command was intended to START the game (/boshlash, /startgame, /go, /play)
+            raw_cmd = message.text.split()[0].lower() if message.text else ""
+            bot_user = (await message.bot.get_me()).username.lower()
+            clean_cmd = raw_cmd.replace(f"@{bot_user}", "").strip()
+
+            is_start_trigger = clean_cmd in ["/boshlash", "/startgame", "/start_game", "/go", "/play"]
+
+            if is_start_trigger:
+                can_start = await check_admin_permission(message.bot, chat_id, message.from_user.id, existing_room.creator_id)
+                if not can_start:
+                    await message.reply("⚠️ Faqat o'yin tashkilotchisi yoki admin o'yinni boshlay oladi!")
+                    return
+
+                if len(existing_room.players) >= MIN_PLAYERS:
+                    if existing_room.lobby_task and not existing_room.lobby_task.done():
+                        existing_room.lobby_task.cancel()
+                    await message.answer("🚀 <b>O'yin boshlanmoqda! Rollar taqsimlanmoqda...</b>", parse_mode="HTML")
+                    await existing_room.start_game()
+                    return
+                else:
+                    rem_needed = max(0, MIN_PLAYERS - len(existing_room.players))
+                    await message.reply(
+                        f"❌ O'yinni boshlash uchun kamida {MIN_PLAYERS} kishi kerak! Hozirda {len(existing_room.players)} ta o'yinchi bor.\n"
+                        f"Yana <b>{rem_needed} ta</b> o'yinchi yetishmayapti. (Bot qo'shish uchun: <code>/addbot</code>)"
+                    )
+                    return
+
+            # If user sent /game again during lobby:
             rem_needed = max(0, MIN_PLAYERS - len(existing_room.players))
-            needed_text = f" Yana <b>{rem_needed} ta</b> o'yinchi kerak." if rem_needed > 0 else " O'yin boshlanishga tayyor!"
+            needed_text = f" Yana <b>{rem_needed} ta</b> o'yinchi kerak." if rem_needed > 0 else " O'yin boshlanishga tayyor! Boshlash uchun: <code>/boshlash</code>"
             await message.reply(
                 f"⚠️ <b>Guruhda ro'yxatdan o'tish allaqachon ketmoqda!</b>\n\n"
                 f"👥 Ro'yxatdagi o'yinchilar: <b>{len(existing_room.players)} ta</b>.{needed_text}\n\n"
@@ -79,8 +109,19 @@ async def start_game_cmd(message: Message):
             )
             return
         else:
+            state_names = {
+                "STARTING": "Rollar taqsimlanmoqda...",
+                "NIGHT": "Tun (harakatlar)",
+                "DAY_TALK": "Kun (tonggi muhokama)",
+                "DAY_VOTE": "Shahar sudi (ovoz berish)"
+            }
+            st_text = state_names.get(existing_room.state, existing_room.state)
+            alive_cnt = len(existing_room.get_alive_players())
             await message.reply(
-                "⚠️ <b>Guruhda ayni paytda o'yin davom etmoqda!</b>\nO'yin tugashini kuting.",
+                f"⚠️ <b>Guruhda ayni paytda o'yin davom etmoqda!</b>\n\n"
+                f"🎮 <b>Hozirgi holat:</b> {st_text} ({existing_room.round_number}-raund)\n"
+                f"👥 <b>Tirik o'yinchilar:</b> {alive_cnt} ta\n\n"
+                f"<i>O'yin tugashini kuting. Majburiy to'xtatish uchun: <code>/stop</code></i>",
                 parse_mode="HTML"
             )
             return

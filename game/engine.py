@@ -841,8 +841,8 @@ class GameRoom:
             winner = "💘 <b>SEVISHGANLAR G'ALABA QOZONDI!</b>\nIkki oshiq barcha xavflardan omon qolib, g'alabaga erishdi!"
             winner_team = Team.NEUTRAL
         elif mafia_count >= (total_alive - mafia_count) and maniac_count == 0 and vampire_count == 0:
-            # Round 1 kunduzi muhokama paytida o'yin birdan tugab qolmasligi uchun (shahar sudiga imkoniyat)
-            if self.round_number == 1 and self.state == "DAY_TALK" and citizen_count > 0:
+            # 1-raund kunduzgi muhokama va sud paytida o'yin birdan tugab qolmasligi uchun
+            if self.round_number <= 1 and self.state in ["DAY_TALK", "DAY_VOTE"] and citizen_count > 0:
                 return False
             winner = "🎩 <b>MAFIYA G'ALABA QOZONDI!</b>\nShahar to'liq mafiya nazorati ostiga o'tdi!"
             winner_team = Team.MAFIA

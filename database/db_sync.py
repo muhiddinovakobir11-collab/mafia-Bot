@@ -5,6 +5,7 @@ import json
 import sqlite3
 import asyncio
 import logging
+import hashlib
 import urllib.request
 import urllib.error
 from pathlib import Path
@@ -23,6 +24,7 @@ class DatabaseSyncManager:
         self.last_backup_time: Optional[float] = None
         self.last_backup_status: str = "Hali bajarilmadi"
         self.last_backup_size: int = 0
+        self.last_saved_hash: Optional[str] = None
 
     def is_configured(self) -> bool:
         return bool(self.token and self.repo and self.backup_path)
@@ -76,7 +78,7 @@ class DatabaseSyncManager:
         url = f"https://api.github.com/repos/{self.repo}/contents/{self.backup_path}"
         b64_content = base64.b64encode(content_bytes).decode("utf-8")
         payload = {
-            "message": f"Auto-sync database backup [{time.strftime('%Y-%m-%d %H:%M:%S')}]",
+            "message": f"Auto-sync database backup [{time.strftime('%Y-%m-%d %H:%M:%S')}] [skip ci] [skip render]",
             "content": b64_content
         }
         if sha:
@@ -128,6 +130,7 @@ class DatabaseSyncManager:
             with open(self.db_path, "wb") as f:
                 f.write(content)
 
+            self.last_saved_hash = hashlib.sha256(content).hexdigest()
             self.last_backup_size = len(content)
             self.last_backup_status = "Cloud'dan tiklandi"
             logger.info(f"✅ Baza GitHub Cloud'dan muvaffaqiyatli tiklandi! ({len(content):,} bayt)")
@@ -144,7 +147,6 @@ class DatabaseSyncManager:
         if not self.db_path.exists():
             return False
 
-        logger.info("📤 Baza GitHub Cloud'ga zaxiralanmoqda...")
         temp_backup = self.db_path.parent / "sync_temp_backup.db"
         try:
             # SQLite online backup API orqali toza nusxa olish
@@ -159,12 +161,19 @@ class DatabaseSyncManager:
 
             data = await asyncio.to_thread(create_clean_dump)
 
+            # Skip backup if database content hasn't changed!
+            current_hash = hashlib.sha256(data).hexdigest()
+            if self.last_saved_hash and self.last_saved_hash == current_hash:
+                return True
+
+            logger.info("📤 Baza o'zgargan, GitHub Cloud'ga zaxiralanmoqda...")
             # Mavjud faylning sha sini olish
             sha, _ = await asyncio.to_thread(self._sync_get_file_info)
 
             # Faylni GitHub ga yuklash
             success = await asyncio.to_thread(self._sync_put_file, data, sha)
             if success:
+                self.last_saved_hash = current_hash
                 self.last_backup_time = time.time()
                 self.last_backup_size = len(data)
                 self.last_backup_status = "Muvaffaqiyatli saqlandi"
