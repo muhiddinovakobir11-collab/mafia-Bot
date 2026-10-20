@@ -1,6 +1,7 @@
 import time
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.filters import Command
 
 from database.db import db
 from bot.keyboards import get_shop_menu_keyboard
@@ -8,8 +9,39 @@ from bot.keyboards import get_shop_menu_keyboard
 router = Router()
 
 @router.message(F.text.contains("Do'kon & Narsalar"))
+@router.message(Command("shop", "store", "market", "dokon", "do'kon"))
+@router.message(F.text.lower().in_(["dokon", "do'kon", "shop", "store", "market"]))
 @router.callback_query(F.data == "open_shop")
 async def show_shop_menu(event: Message | CallbackQuery):
+    if isinstance(event, Message) and event.chat.type in ["group", "supergroup"]:
+        bot_info = await event.bot.get_me()
+        bot_url = f"https://t.me/{bot_info.username}?start=shop"
+        group_kb = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🤖 Botga o'tish ➔", url=bot_url)]
+        ])
+        await event.reply(
+            "🛍️ <b>Do'kon shaxsiy lichkangizga yuborildi!</b>\n"
+            "<i>Do'konni ochish uchun pastdagi tugmani bosing:</i>",
+            parse_mode="HTML",
+            reply_markup=group_kb
+        )
+        try:
+            shop_text = (
+                "🛍️ <b>MAFIYA SEHRLI DO'KONI</b>\n\n"
+                "Bu yerda o'yinda sizga ustunlik beruvchi kuchli artefaktlar, himoya vositalari va VIP statusni "
+                "💰 <b>Pul</b> yoki 💎 <b>Almaz</b> evaziga sotib olishingiz mumkin!\n\n"
+                "<i>Qaysi bo'limga o'tmoqchisiz?</i>"
+            )
+            await event.bot.send_message(
+                event.from_user.id,
+                shop_text,
+                parse_mode="HTML",
+                reply_markup=get_shop_menu_keyboard()
+            )
+        except Exception:
+            pass
+        return
+
     text = (
         "🛍️ <b>MAFIYA SEHRLI DO'KONI</b>\n\n"
         "Bu yerda o'yinda sizga ustunlik beruvchi kuchli artefaktlar, himoya vositalari va VIP statusni "

@@ -164,6 +164,41 @@ async def cmd_start(message: Message):
         except Exception as e:
             print(f"[Clan invite deep link error]: {e}")
 
+    # Handle deep link shortcuts
+    if len(args) > 1:
+        param = args[1].lower()
+        if param == "profile":
+            full_card = await build_full_profile_card(user)
+            await message.answer(full_card, parse_mode="HTML", reply_markup=get_profile_keyboard())
+            return
+        elif param == "shop":
+            from bot.handlers.shop import show_shop_menu
+            await show_shop_menu(message)
+            return
+        elif param == "garage":
+            from bot.handlers.extra_features import show_garage
+            await show_garage(message)
+            return
+        elif param == "inventory":
+            inv = await db.get_inventory(user_id)
+            if not inv:
+                await message.answer("🎒 <b>Sizning inventaringiz bo'sh!</b>\nDo'kondan buyumlar sotib oling.")
+            else:
+                txt = "🎒 <b>SIZNING INVENTARINGIZ:</b>\n\n"
+                for it in inv:
+                    txt += f"{it['icon']} <b>{it['name']}</b>: {it['quantity']} ta\n   <i>{it['description']}</i>\n\n"
+                txt += "<i>Buyumlar o'yin boshlanganda yoki o'yin davomida avtomatik ishlatiladi.</i>"
+                await message.answer(txt, parse_mode="HTML")
+            return
+        elif param == "games":
+            from bot.handlers.extra_features import show_casino_menu
+            await show_casino_menu(message)
+            return
+        elif param == "stars":
+            from bot.handlers.stars_pay import show_stars_almaz_menu
+            await show_stars_almaz_menu(message)
+            return
+
     # If new user and has referrer, reward referrer
     if referred_by and user.get("created_at") and user.get("referred_by") == referred_by:
         await db.update_balance(referred_by, pul_diff=500, almaz_diff=2)
@@ -268,19 +303,20 @@ async def show_profile(message: Message):
 
     if message.chat.type in ["group", "supergroup"]:
         bot_info = await message.bot.get_me()
-        dm_url = f"https://t.me/{bot_info.username}?start=profile"
+        bot_url = f"https://t.me/{bot_info.username}?start=profile"
         group_kb = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="👤 To'liq profil (Lichkada) ➔", url=dm_url)]
+            [InlineKeyboardButton(text="🤖 Botga o'tish ➔", url=bot_url)]
         ])
         group_text = (
-            f"👤 <b>O'YINCHI BALANSI VA STATUSI</b>\n"
+            f"👤 <b>O'YINCHI MA'LUMOTI</b>\n"
             f"━━━━━━━━━━━━━━━━━━━━━\n"
-            f"👤 <b>Foydalanuvchi:</b> <b>{user['full_name']}</b>\n"
-            f"💵 <b>Naqd pul:</b> <b>{user['pul']:,} Pul</b>\n"
-            f"💎 <b>Olmoslar:</b> <b>{user['almaz']:,} ta</b>\n"
-            f"💍 <b>Jufti / Parasi:</b> <b>{spouse_str}</b>\n"
+            f"🆔 <b>ID:</b> <code>{user['id']}</code>\n"
+            f"👤 <b>Ism:</b> <b>{user['full_name']}</b>\n"
+            f"💰 <b>Pul:</b> <b>{user['pul']:,} Pul</b>\n"
+            f"💎 <b>Almaz:</b> <b>{user['almaz']:,} ta</b>\n"
+            f"💍 <b>Parasi:</b> <b>{spouse_str}</b>\n"
             f"━━━━━━━━━━━━━━━━━━━━━\n"
-            f"📩 <i>Mashinalaringiz soni, daraja va to'liq ma'lumotlar shaxsiy lichkangizga yuborildi!</i>"
+            f"📩 <i>Qolgan barcha ma'lumotlar bot lichkasiga yuborildi!</i>"
         )
         await message.reply(group_text, parse_mode="HTML", reply_markup=group_kb)
 
@@ -295,6 +331,45 @@ async def show_profile(message: Message):
     # In DM (private chat): show full card
     full_card = await build_full_profile_card(user)
     await message.answer(full_card, parse_mode="HTML", reply_markup=get_profile_keyboard())
+
+@router.message(Command("inventory", "inventar", "narsalar", "items", "sumka"))
+async def cmd_inventory_group(message: Message):
+    bot_info = await message.bot.get_me()
+    bot_url = f"https://t.me/{bot_info.username}?start=inventory"
+    if message.chat.type in ["group", "supergroup"]:
+        group_kb = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🤖 Botga o'tish ➔", url=bot_url)]
+        ])
+        await message.reply(
+            "🎒 <b>Inventaringiz shaxsiy lichkangizga yuborildi!</b>\n"
+            "<i>Inventarni ko'rish uchun pastdagi tugmani bosing:</i>",
+            parse_mode="HTML",
+            reply_markup=group_kb
+        )
+        try:
+            inv = await db.get_inventory(message.from_user.id)
+            if not inv:
+                dm_txt = "🎒 <b>Sizning inventaringiz bo'sh!</b>\nDo'kondan buyumlar sotib oling."
+            else:
+                dm_txt = "🎒 <b>SIZNING INVENTARINGIZ:</b>\n\n"
+                for it in inv:
+                    dm_txt += f"{it['icon']} <b>{it['name']}</b>: {it['quantity']} ta\n   <i>{it['description']}</i>\n\n"
+                dm_txt += "<i>Buyumlar o'yin boshlanganda yoki o'yin davomida avtomatik ishlatiladi.</i>"
+            await message.bot.send_message(message.from_user.id, dm_txt, parse_mode="HTML")
+        except Exception:
+            pass
+        return
+
+    # In DM:
+    inv = await db.get_inventory(message.from_user.id)
+    if not inv:
+        await message.answer("🎒 <b>Sizning inventaringiz bo'sh!</b>\nDo'kondan buyumlar sotib oling.")
+        return
+    txt = "🎒 <b>SIZNING INVENTARINGIZ:</b>\n\n"
+    for it in inv:
+        txt += f"{it['icon']} <b>{it['name']}</b>: {it['quantity']} ta\n   <i>{it['description']}</i>\n\n"
+    txt += "<i>Buyumlar o'yin boshlanganda yoki o'yin davomida avtomatik ishlatiladi.</i>"
+    await message.answer(txt, parse_mode="HTML")
 
 @router.message(Command("lang", "language", "til"))
 @router.message(F.text.contains("Tilni tanlash"))

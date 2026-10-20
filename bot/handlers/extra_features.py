@@ -24,8 +24,36 @@ router = Router()
 # 0. KAZINO ASOSIY MENYUSI
 # ==============================================================================
 @router.message(F.text.contains("Kazino & O'yinlar"))
-@router.message(Command("games"))
+@router.message(Command("games", "casino", "kazino"))
+@router.message(F.text.lower().in_(["kazino", "casino", "games", "o'yinlar", "oyinlar"]))
 async def show_casino_menu(message: Message):
+    if message.chat.type in ["group", "supergroup"]:
+        bot_info = await message.bot.get_me()
+        bot_url = f"https://t.me/{bot_info.username}?start=games"
+        group_kb = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🤖 Botga o'tish ➔", url=bot_url)]
+        ])
+        await message.reply(
+            "🎰 <b>Kazino va mini-o'yinlar shaxsiy lichkangizga yuborildi!</b>\n"
+            "<i>O'yinlarni boshlash uchun pastdagi tugmani bosing:</i>",
+            parse_mode="HTML",
+            reply_markup=group_kb
+        )
+        try:
+            user = await db.get_user(message.from_user.id)
+            pul_bal = user["pul"] if user else 0
+            almaz_bal = user["almaz"] if user else 0
+            text = (
+                f"🎰 <b>KAZINO VA MINI-O'YINLAR ZALI</b> 🎲\n\n"
+                f"Mablag'ingiz: <b>{pul_bal:,} Pul</b> | 💎 <b>{almaz_bal} Almaz</b>\n\n"
+                f"Bu yerda omadingizni sinab ko'rishingiz, do'stlaringiz bilan bellashishingiz yoki sovrinlar yutib olishingiz mumkin!\n\n"
+                f"🎮 <b>O'yinni tanlang:</b>"
+            )
+            await message.bot.send_message(message.from_user.id, text, parse_mode="HTML", reply_markup=get_casino_menu_keyboard())
+        except Exception:
+            pass
+        return
+
     user = await db.get_user(message.from_user.id)
     pul_bal = user["pul"] if user else 0
     almaz_bal = user["almaz"] if user else 0
@@ -934,9 +962,8 @@ CAR_DEFINITIONS = [
     ("mashina_matiz", "🚗 Daewoo Matiz ('Tezkor')", "10% suiqasddan qochish"),
 ]
 
-@router.message(Command("garage"))
-@router.message(Command("garaj"))
-@router.message(Command("mashinalar"))
+@router.message(Command("garage", "garaj", "mashinalar", "moshinalar", "avtopark"))
+@router.message(F.text.lower().in_(["garage", "garaj", "mashinalar", "moshinalar", "avtopark", "/garage", "/garaj", "/mashinalar"]))
 async def show_garage(message: Message):
     inv = await db.get_inventory(message.from_user.id)
     inv_map = {it["code"]: it["quantity"] for it in inv}
@@ -948,20 +975,38 @@ async def show_garage(message: Message):
             cars_txt.append(f"• <b>{title}</b> ({cnt} ta) — <i>{stat}</i>")
 
     if not cars_txt:
-        await message.answer(
+        garage_text = (
             "🚗 <b>SIZNING GARAJIYINGIZ BO'SH!</b>\n\n"
             "Sizda hali mashina yo'q. Mashinalar kechasi mafiya yoki qotil hujumidan **qochib qolish** imkonini beradi!\n\n"
             "<i>Mashinalarni 🛍️ Do'kondan xarid qilishingiz yoki do'stlaringizdan sovg'a olishingiz mumkin.</i>"
         )
+    else:
+        garage_text = (
+            f"🚗 <b>SIZNING MAFIYA GARAJIYINGIZ:</b>\n\n" +
+            "\n".join(cars_txt) +
+            "\n\n✨ <i>Ushbu avtomobillar o'yinda passiv himoya sifatida avtomatik ishlaydi!</i>\n"
+            "🎁 <i>Do'stingizga mashina sovg'a qilish uchun uning xabariga reply qilib <code>/givecar</code> deb yozing!</i>"
+        )
+
+    if message.chat.type in ["group", "supergroup"]:
+        bot_info = await message.bot.get_me()
+        bot_url = f"https://t.me/{bot_info.username}?start=garage"
+        group_kb = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🤖 Botga o'tish ➔", url=bot_url)]
+        ])
+        await message.reply(
+            "🚗 <b>Garajingiz va mashinalaringiz ro'yxati shaxsiy lichkangizga yuborildi!</b>\n"
+            "<i>Garajni ko'rish uchun pastdagi tugmani bosing:</i>",
+            parse_mode="HTML",
+            reply_markup=group_kb
+        )
+        try:
+            await message.bot.send_message(message.from_user.id, garage_text, parse_mode="HTML")
+        except Exception:
+            pass
         return
 
-    await message.answer(
-        f"🚗 <b>SIZNING MAFIYA GARAJIYINGIZ:</b>\n\n" +
-        "\n".join(cars_txt) +
-        "\n\n✨ <i>Ushbu avtomobillar o'yinda passiv himoya sifatida avtomatik ishlaydi!</i>\n"
-        "🎁 <i>Do'stingizga mashina sovg'a qilish uchun uning xabariga reply qilib <code>/givecar</code> deb yozing!</i>",
-        parse_mode="HTML"
-    )
+    await message.answer(garage_text, parse_mode="HTML")
 
 @router.message(Command("givecar", "giftcar", "moshinasovga", "mashinasovga", "avtosovga", "moshinaotkazish", "mashinaotkazish"))
 @router.message(F.text.lower().startswith(("moshina sovga", "mashina sovga", "moshina otkazish", "mashina otkazish")))

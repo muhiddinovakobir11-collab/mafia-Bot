@@ -3,8 +3,11 @@ from aiogram.types import (
     Message,
     CallbackQuery,
     PreCheckoutQuery,
-    LabeledPrice
+    LabeledPrice,
+    InlineKeyboardMarkup,
+    InlineKeyboardButton
 )
+from aiogram.filters import Command
 from database.db import db
 from bot.keyboards import get_star_packages_keyboard
 
@@ -12,9 +15,36 @@ router = Router()
 
 @router.message(F.text.contains("Stars to'ldirish"))
 @router.message(F.text.contains("Stars orqali"))
+@router.message(Command("stars", "donat", "donate"))
 @router.callback_query(F.data == "buy_stars_menu")
 @router.callback_query(F.data == "stars_type_almaz")
 async def show_stars_almaz_menu(event: Message | CallbackQuery):
+    if isinstance(event, Message) and event.chat.type in ["group", "supergroup"]:
+        bot_info = await event.bot.get_me()
+        bot_url = f"https://t.me/{bot_info.username}?start=stars"
+        group_kb = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🤖 Botga o'tish ➔", url=bot_url)]
+        ])
+        await event.reply(
+            "⭐️ <b>Stars va to'lovlar menyusi shaxsiy lichkangizga yuborildi!</b>\n"
+            "<i>Paketlarni ko'rish uchun pastdagi tugmani bosing:</i>",
+            parse_mode="HTML",
+            reply_markup=group_kb
+        )
+        try:
+            packages = await db.get_star_packages(pkg_type="almaz", only_active=True)
+            text = (
+                "⭐️ <b>TELEGRAM STARS ORQALI ALMAZ VA PUL XARID QILISH</b> ⭐️\n\n"
+                "Almazlar — botdagi premium valyuta bo'lib, ular orqali eng kuchli artefaktlar, "
+                "VIP status va noyob unvonlarni sotib olishingiz mumkin!\n\n"
+                "<i>Quyidagi paketlardan birini tanlang:</i>"
+            )
+            kb = get_star_packages_keyboard(packages, pkg_type="almaz")
+            await event.bot.send_message(event.from_user.id, text, parse_mode="HTML", reply_markup=kb)
+        except Exception:
+            pass
+        return
+
     packages = await db.get_star_packages(pkg_type="almaz", only_active=True)
     text = (
         "⭐️ <b>TELEGRAM STARS ORQALI ALMAZ VA PUL XARID QILISH</b> ⭐️\n\n"
