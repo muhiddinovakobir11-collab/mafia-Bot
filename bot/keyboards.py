@@ -116,7 +116,7 @@ def get_lobby_keyboard(chat_id: int, bot_username: str = None) -> InlineKeyboard
 def get_group_redirect_keyboard(group_url: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [
-            InlineKeyboardButton(text="🔵 Перейти в группу", url=group_url)
+            InlineKeyboardButton(text="👥 Guruhga qaytish ➔", url=group_url)
         ]
     ])
 

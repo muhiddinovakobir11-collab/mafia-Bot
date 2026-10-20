@@ -210,18 +210,24 @@ async def show_profile(message: Message):
     rep = user.get("rep") or 0
 
     prof_text = (
-        f"👤 <b>FOYDALANUVCHI PROFILI:</b>\n\n"
+        f"🎩 <b>MAFIA SHAXSIY PROFILI</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━━\n"
+        f"👤 <b>Ism:</b> <b>{user['full_name']}</b>\n"
         f"🆔 <b>ID:</b> <code>{user['id']}</code>\n"
-        f"👤 <b>Ism:</b> {user['full_name']}\n"
-        f"🎖 <b>Daraja (Level):</b> {user['level']}-daraja\n"
-        f"⚡ <b>XP (Tajriba):</b> {user['xp']} / {xp_needed} XP\n"
-        f"⭐ <b>Obro' (Reputatsiya):</b> {rep}\n"
-        f"💍 <b>Oila:</b> {spouse_str}\n\n"
-        f"💰 <b>Cho'ntakdagi pul:</b> {user['pul']:,} Pul\n"
-        f"🏦 <b>Bankdagi pul:</b> {bank_pul:,} Pul\n"
-        f"💎 <b>Almaz:</b> {user['almaz']:,} ta\n"
-        f"👑 <b>VIP Status:</b> {vip_str}\n\n"
-        f"📊 <b>O'yinlar:</b> {user['games_played']} ta o'ynalgan, {user['games_won']} ta g'alaba"
+        f"👑 <b>VIP Maqom:</b> <b>{vip_str}</b>\n"
+        f"💍 <b>Oila:</b> <b>{spouse_str}</b>\n\n"
+        f"🎖 <b>Daraja:</b> <b>{user['level']}-bosqich</b>\n"
+        f"⚡ <b>Tajriba (XP):</b> <b>{user['xp']:,}</b> / {xp_needed:,} XP\n"
+        f"⭐ <b>Obro' (Rep):</b> <b>{rep}</b> ball\n\n"
+        f"💰 <b>MABLAG'LAR:</b>\n"
+        f"  💵 Cho'ntakda: <b>{user['pul']:,} Pul</b>\n"
+        f"  🏦 Bank hisobida: <b>{bank_pul:,} Pul</b>\n"
+        f"  💎 Olmoslar: <b>{user['almaz']:,} ta</b>\n\n"
+        f"🎲 <b>O'YIN STATISTIKASI:</b>\n"
+        f"  ⚔️ Jami janglar: <b>{user['games_played']} ta</b>\n"
+        f"  🏆 G'alabalar: <b>{user['games_won']} ta</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━━\n"
+        f"👇 <i>Pastdagi tugmalar orqali inventaringiz va do'konga o'ting:</i>"
     )
     await message.answer(prof_text, parse_mode="HTML", reply_markup=get_profile_keyboard())
 
@@ -322,6 +328,50 @@ async def game_roles_help(message: Message):
     text += (
         "💡 <b>Eslatma:</b> Botda zerikarli tinch aholi roli yo'q! "
         "Har bir o'yinchi maxsus qobiliyatli va kuchli rolga ega bo'ladi."
+    )
+    await message.answer(text, parse_mode="HTML")
+
+@router.message(Command("help", "commands", "komandalar", "buyruqlar"))
+async def show_all_commands(message: Message):
+    text = (
+        "📜 <b>MAFIA BOT — BARCHA BUYRUQLAR RO'YXATI</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━━\n\n"
+        "🎮 <b>O'YIN BUYRUQLARI (Guruhda):</b>\n"
+        "  • <code>/game</code> yoki <code>/mafia</code> — Guruhda yangi o'yin ro'yxatdan o'tishini ochish\n"
+        "  • <code>/boshlash</code> yoki <code>/startgame</code> — O'yinni darhol boshlash (kamida 3 kishi)\n"
+        "  • <code>/addbot</code> — O'yinga virtual AI bot qo'shish\n"
+        "  • <code>/stop</code> — O'yinni to'xtatish (admin/tashkilotchi)\n"
+        "  • <code>/roles</code> — Barcha qahramonlar va ularning vazifalari\n\n"
+        "💰 <b>MOLIYA VA SOVG'ALAR:</b>\n"
+        "  • <code>/pay @user summa</code> — Do'stingizga naqd pul o'tkazish\n"
+        "  • <code>/payalmaz @user miqdor</code> — Do'stingizga olmos o'tkazish\n"
+        "  • <code>/bank depozit summa</code> — Pulni bankka qo'yish (xavfsiz saqlash)\n"
+        "  • <code>/rob @user</code> — Boshqa o'yinchidan pul o'g'irlashga urinish\n"
+        "  • <code>/rep +</code> yoki <code>/rep -</code> — O'yinchiga obro' (reputatsiya) berish/olish\n\n"
+        "🚗 <b>GARAJ VA AVTOMOBILLAR:</b>\n"
+        "  • <code>/garage</code> yoki <code>/mashinalar</code> — Garajingizdagi avtomobillarni ko'rish\n"
+        "  • <code>/givecar @user</code> — Do'stingizga avtomobil sovg'a qilish\n\n"
+        "💍 <b>OILA VA NIKOH:</b>\n"
+        "  • <code>/marry</code> — Xabarga reply qilib, turmush qurish taklif qilish\n"
+        "  • <code>/divorce</code> — Nikohni bekor qilish (ajrashish)\n\n"
+        "🎰 <b>KAZINO VA O'YINLAR:</b>\n"
+        "  • <code>/games</code> — Kazino zali asosiy menyusi\n"
+        "  • <code>/slot summa</code> — Slot mashinasini aylantirish\n"
+        "  • <code>/darts summa</code> — Darts musobaqasi\n"
+        "  • <code>/dice summa</code> — Omadli kubik tashlash\n"
+        "  • <code>/spin</code> — Omad charxpalagini aylantirish\n"
+        "  • <code>/box</code> — Qimmatbaho sandiqlarni ochish (Lootbox)\n"
+        "  • <code>/duel @user summa</code> — O'yinchi bilan 1v1 duel jangi\n\n"
+        "🏰 <b>KLANLAR VA REYTING:</b>\n"
+        "  • <code>/clans</code> — Klanlar ro'yxati va boshqaruvi\n"
+        "  • <code>/top</code> — Eng kuchli mafiozlar reytingi\n"
+        "  • <code>/gtop</code> — Guruh statistikasi\n"
+        "  • <code>/ref</code> — Shaxsiy referal havolangiz (do'stlarni chaqirib pul ishlash)\n"
+        "  • <code>/bonus</code> — Kunlik bepul bonusni olish\n\n"
+        "⚙️ <b>SOZLAMALAR:</b>\n"
+        "  • <code>/settings</code> — Guruhning vaqt va qoidalarini sozlash\n"
+        "━━━━━━━━━━━━━━━━━━━━━\n"
+        "💡 <i>Guruhda o'yin boshlash uchun: <code>/game</code> buyrug'ini yuboring!</i>"
     )
     await message.answer(text, parse_mode="HTML")
 

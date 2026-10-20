@@ -43,7 +43,7 @@ async def handle_night_action(call: CallbackQuery):
             if teammate.user_id != player.user_id and ROLES[teammate.role_code].team == Team.MAFIA:
                 await room.send_dm(
                     teammate.user_id,
-                    f"👥 <b>Сообщник {player.full_name}</b> выбрал целью: <b>{target.full_name}</b>"
+                    f"👥 <b>Mafiya sherigingiz {player.full_name}</b> bu kecha nishon qilib <b>{target.full_name}</b>ni tanladi!"
                 )
 
     # Smart Night: if all active roles completed their choice, wake town up early!

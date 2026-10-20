@@ -17,19 +17,30 @@ def format_lobby_text(room) -> str:
         for i, p in enumerate(room.players.values(), 1):
             safe_name = html.escape(p.full_name)
             if p.is_bot:
-                player_lines.append(f"{i}. 🤖 <b>{safe_name}</b>")
+                player_lines.append(f"  {i}. 🤖 <b>{safe_name}</b>")
             else:
-                player_lines.append(f'{i}. 👤 <a href="tg://user?id={p.user_id}">{safe_name}</a>')
+                player_lines.append(f'  {i}. 👤 <a href="tg://user?id={p.user_id}">{safe_name}</a>')
         players_text = "\n".join(player_lines)
     else:
-        players_text = "<i>Hozircha hech kim yo'q</i>"
+        players_text = "  <i>Hozircha hech kim ro'yxatdan o'tmadi</i>"
+
+    rem_needed = max(0, MIN_PLAYERS - len(room.players))
+    if rem_needed == 0:
+        status_line = "🟢 <b>O'yin boshlanishga to'liq tayyor!</b>"
+    else:
+        status_line = f"🟡 <b>Yana kamida {rem_needed} ta o'yinchi kerak</b>"
 
     return (
-        f"🎭 <b>MAFIA — RO'YXATDAN O'TISH BOSHQICHI!</b>\n\n"
-        f"📋 <b>Ro'yxatdan o'tgan o'yinchilar:</b>\n"
+        f"🎭 <b>MAFIA — RO'YXATDAN O'TISH BOSHQICHI</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━━\n"
+        f"🌑 <i>Shahar uzra qora tun yaqinlashmoqda... Mafiya va qonxo'rlar ko'chalarga chiqishga shaylanmoqda!</i>\n\n"
+        f"📋 <b>Qatnashuvchilar ro'yxati:</b>\n"
         f"{players_text}\n\n"
-        f"👥 Jami: <b>{len(room.players)} ta</b> (Kamida {MIN_PLAYERS} kishi kerak)\n\n"
-        f"👇 <i>Pastdagi tugmalar orqali qo'shiling yoki o'yinni boshlang:</i>"
+        f"👥 <b>Jami o'yinchilar:</b> <b>{len(room.players)}</b> / {MIN_PLAYERS}+\n"
+        f"📊 <b>Holat:</b> {status_line}\n"
+        f"━━━━━━━━━━━━━━━━━━━━━\n"
+        f"👇 <i>O'yinga kirish uchun <b>'🤵 Qo'shilish'</b> tugmasini bosing!</i>\n"
+        f"🚀 <i>Boshlash uchun: <code>/boshlash</code> yoki tugmani bosing.</i>"
     )
 
 async def check_admin_permission(bot, chat_id: int, user_id: int, creator_id: int) -> bool:
@@ -582,7 +593,7 @@ async def cmd_game_rules(message: Message):
         "🌑 <b>TUN:</b> Shahar uxlaydi. Don va Mafiya qurbon tanlaydi, Komissar tekshiradi, Shifokor qutqaradi, Qotil suiqasd qiladi.\n"
         "☀️ <b>KUN:</b> Tungi qurbonlar e'lon qilinadi, shahar fuqarolari muhokama boshlaydi.\n"
         "⚖️ <b>SUD VA OVOZ BERISH:</b> Gumonlanuvchini osish uchun ovoz beriladi. Ko'pchilik ovoz olgan o'yinchiga 10 soniya oqlanish nutqi beriladi va u dorga osiladi.\n\n"
-        "🤫 <b>Asosiy qoida:</b> Halok bo'lganlar o'yin tugaguncha guruhda gapira olmaydi (Мертвые молчат)!"
+        "🤫 <b>Oltin qoida:</b> Halok bo'lganlar o'yin tugaguncha guruhda gapira olmaydi (O'lganlar jim turadi)!"
     )
     await message.answer(rules_text, parse_mode="HTML")
 
@@ -596,7 +607,7 @@ class GameFilterMiddleware(BaseMiddleware):
 
         room = game_manager.get_room(event.chat.id)
         if room and room.state not in ["LOBBY", "GAME_OVER"]:
-            # 1. "Мертвые молчат" rule: Dead players cannot speak during active game!
+            # 1. Dead players cannot speak during active game! (O'lganlar jim turadi)
             player = room.get_player(event.from_user.id)
             if player and not player.is_alive:
                 try:

@@ -12,7 +12,7 @@ DEFAULT_ITEMS = [
     ("adrenalin", "⚡ Adrenalin", "⚡", "O'ldirilsa ham darhol halok bo'lmaydi, ertasi kuni ovoz bera oladi.", 4000, 10, 1),
     ("mute", "🤫 Sukunat ichimligi", "🤫", "Keyingi kunduzgi bahsda tanlangan o'yinchini gapirishdan to'xtatadi.", 2200, 5, 1),
     ("omadli_tanga", "🎲 Omadli tanga", "🎲", "35% ehtimol bilan tunda o'qdan yoki kunduzi osilishdan qutqaradi.", 5000, 12, 1),
-    ("hujjat", "📁 Qalbaki Hujjatlar", "📁", "Komissar tekshiruvidan to'liq himoya (Документы).", 2500, 5, 1),
+    ("hujjat", "📁 Qalbaki Hujjatlar", "📁", "Komissar tekshiruvidan to'liq himoya (Hujjatlar).", 2500, 5, 1),
     ("osilish_himoya", "⚖️ Osilishdan himoya", "⚖️", "Kunduzgi osilishdan 1 marta qutqaradi.", 3000, 6, 1),
     ("qotil_himoya", "⛑️ Qotildan himoya", "⛑️", "Maniak suiqasdidam 1 marta himoya.", 3000, 6, 1),
     ("miltiq", "🔫 Miltiq (Vintovka)", "🔫", "Tunda qo'shimcha o'q uzish imkoniyati.", 4500, 10, 1),

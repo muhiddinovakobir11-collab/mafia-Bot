@@ -189,7 +189,7 @@ class GameRoom:
 
         group_url = await self.get_group_link()
         group_kb = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="Перейти в группу", url=group_url)]
+            [InlineKeyboardButton(text="👥 Guruhga qaytish ➔", url=group_url)]
         ])
 
         # 1. Pre-assign roles to all players
@@ -214,13 +214,13 @@ class GameRoom:
                     p.extra_votes += 2
                     await db.consume_inventory_item(p.user_id, "extra_vote", 1)
 
-            # Send private message to player with their role matching TrueMafia format
-            shield_txt = "\n🛡️ <i>Защитный щит активирован!</i>" if p.has_shield else ""
-            mask_txt = "\n🎭 <i>Маска мафии активирована!</i>" if p.has_mask else ""
-            vote_txt = "\n🗳️ <i>Дополнительные голоса: +2!</i>" if p.extra_votes > 0 else ""
+            # Send private message to player with their role
+            shield_txt = "\n🛡️ <i>Qalqon faol (tungi bitta hujumdan 100% himoya)!</i>" if p.has_shield else ""
+            mask_txt = "\n🎭 <i>Mafiya niqobi faol (tekshiruvda toza ko'rinasiz)!</i>" if p.has_mask else ""
+            vote_txt = "\n🗳️ <i>Qo'shimcha ovozlar: +2 ta ovoz kuchi!</i>" if p.extra_votes > 0 else ""
 
-            role_title = r_info.ru_name or r_info.name
-            role_desc = r_info.ru_description or r_info.description
+            role_title = r_info.name
+            role_desc = r_info.description
 
             team_info = ""
             if r_info.team == Team.MAFIA:
@@ -229,17 +229,20 @@ class GameRoom:
                     if m.user_id != p.user_id and m.role_code in ROLES and ROLES[m.role_code].team == Team.MAFIA
                 ]
                 if mafia_team:
-                    team_info = f"\n\n👥 <b>Ваши сообщники:</b> {', '.join(mafia_team)}"
+                    team_info = f"\n\n👥 <b>Sizning Mafiya sheriklaringiz:</b>\n" + "\n".join([f"  • {name}" for name in mafia_team])
             elif p.role_code == "serjant":
                 komissars = [m.full_name for m in player_list if m.role_code == "komissar"]
                 if komissars:
-                    team_info = f"\n\n🕵️‍♂️ <b>Ваш Комиссар:</b> {', '.join(komissars)}"
+                    team_info = f"\n\n🕵️‍♂️ <b>Sizning Komissaringiz:</b> {', '.join(komissars)}"
 
             dm_text = (
-                f"<b>Вы - {r_info.emoji} {role_title}!</b>\n"
-                f"{role_desc}"
+                f"🎭 <b>SIZNING ROLINGIZ: {r_info.emoji} {role_title}!</b>\n"
+                f"━━━━━━━━━━━━━━━━━━━━━\n"
+                f"📖 <b>Vazifangiz:</b>\n{role_desc}"
                 f"{team_info}"
-                f"{shield_txt}{mask_txt}{vote_txt}"
+                f"{shield_txt}{mask_txt}{vote_txt}\n"
+                f"━━━━━━━━━━━━━━━━━━━━━\n"
+                f"🤫 <i>O'z rolingizni hech kimga aytmang va ehtiyotkor bo'ling!</i>"
             )
             await self.send_dm(p.user_id, dm_text, reply_markup=group_kb)
 
@@ -735,7 +738,7 @@ class GameRoom:
                     )
                     await asyncio.sleep(10)
 
-                    # Check osilish_himoya (Защита от повешения)
+                    # Check osilish_himoya (Dordan himoya)
                     inv = await db.get_inventory(candidate.user_id)
                     has_rope_prot = any(it["code"] == "osilish_himoya" and it["quantity"] > 0 for it in inv)
                     if has_rope_prot:
@@ -869,14 +872,13 @@ class GameRoom:
         xp_diff: int,
         user_data: Dict[str, Any],
         inventory: List[Dict[str, Any]],
-        active_role: str = "Нет",
+        active_role: str = "Oddiy",
         has_sponsor_bonus: bool = False
     ) -> str:
         inv_map = {item["code"]: item["quantity"] for item in inventory}
 
         pul = user_data.get("pul", 0)
         almaz = user_data.get("almaz", 0)
-        gold = 0
 
         qalqon = inv_map.get("qalqon", 0)
         hujjat = inv_map.get("hujjat", 0)
@@ -891,29 +893,29 @@ class GameRoom:
         games_won = user_data.get("games_won", 0)
         games_played = user_data.get("games_played", 0)
 
-        pul_sign = f"{pul_diff}" if pul_diff <= 0 else f"{pul_diff}"
-        xp_sign = f"{xp_diff}" if xp_diff <= 0 else f"{xp_diff}"
-        bonus_msg = "✅ <b>Вы подписаны на канал: Награда x2 получена!</b>" if has_sponsor_bonus else "Если вы подпишетесь на канал , вы получите награду x2!"
+        pul_sign = f"+{pul_diff}" if pul_diff > 0 else f"{pul_diff}"
+        xp_sign = f"+{xp_diff}" if xp_diff > 0 else f"{xp_diff}"
+        bonus_msg = "⭐️ <b>Kanal a'zoligi uchun x2 mukofot berildi!</b>" if has_sponsor_bonus else "💡 <i>Kanalimizga obuna bo'lib, har o'yinda 2x ko'proq mukofot oling!</i>"
 
         card = (
-            f"🏁 <b>Игра окончена.</b>\n"
-            f"Вам начислено 💵 {pul_sign} и 🎯 {xp_sign}!\n\n"
-            f"👤 {player_tag}\n\n"
-            f"💵 Доллары: {pul}\n"
-            f"💎 Алмазы: {almaz}\n"
-            f"💰 Золото: {gold}\n\n"
-            f"🛡 Защита: {qalqon}\n"
-            f"📁 Документы: {hujjat}\n"
-            f"⚖️ Защита от повешения: {osilish}\n"
-            f"⛑️ Защита от убийцы: {qotil}\n"
-            f"🔫 Винтовка: {miltiq}\n"
-            f"💊 Защита от зелья: {zardob}\n"
-            f"🎭 Маска: {niqob}\n"
-            f"🪤 Защита от скольжения: {qopqon}\n"
-            f"🔰 Защита от героя: {qahramon}\n\n"
-            f"🎯 Победы: {games_won}\n"
-            f"🎲 Всего игр: {games_played}\n\n"
-            f"🃏 Активные роли: {active_role}\n\n"
+            f"🏁 <b>O'YIN YAKUNLANDI — SHAXSIY HISOBOT</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━━\n"
+            f"🎁 <b>Qabul qilindi:</b> 💵 <b>{pul_sign} Pul</b> | 🎯 <b>{xp_sign} XP</b>\n\n"
+            f"👤 <b>O'yinchi:</b> {player_tag}\n"
+            f"🎖 <b>Maqom:</b> <b>{active_role}</b>\n\n"
+            f"💰 <b>Mablag'lar:</b>\n"
+            f"  💵 Naqd pul: <b>{pul:,}</b>\n"
+            f"  💎 Olmoslar: <b>{almaz:,}</b>\n\n"
+            f"🎒 <b>Maxsus anjomlar:</b>\n"
+            f"  🛡 Qalqon: <b>{qalqon}</b> ta  |  🎭 Niqob: <b>{niqob}</b> ta\n"
+            f"  📁 Hujjat: <b>{hujjat}</b> ta  |  ⚖️ Dor himoyasi: <b>{osilish}</b> ta\n"
+            f"  ⛑️ Qotil himoyasi: <b>{qotil}</b> ta  |  🔫 Miltiq: <b>{miltiq}</b> ta\n"
+            f"  💉 Zardob: <b>{zardob}</b> ta  |  🪤 Qopqon: <b>{qopqon}</b> ta\n"
+            f"  🔰 Qahramon himoyasi: <b>{qahramon}</b> ta\n\n"
+            f"📊 <b>Umumiy statistika:</b>\n"
+            f"  🏆 G'alabalar: <b>{games_won} ta</b>\n"
+            f"  🎲 Jami o'yinlar: <b>{games_played} ta</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━━\n"
             f"{bonus_msg}"
         )
         return card
@@ -955,7 +957,7 @@ class GameRoom:
                     xp_diff=base_xp,
                     user_data={"pul": 1000, "almaz": 5, "games_won": 1, "games_played": 1},
                     inventory=[],
-                    active_role="🤖 Бот"
+                    active_role="🤖 Bot"
                 )
                 player_cards.append((p.user_id, card_text))
                 continue
@@ -1008,7 +1010,7 @@ class GameRoom:
             # Format player end-game card matching user template with player tag
             updated_u = await db.get_user(p.user_id) or {}
             inv = await db.get_inventory(p.user_id)
-            active_role = "👑 VIP" if is_vip else (updated_u.get("custom_title") or "Нет")
+            active_role = "👑 VIP" if is_vip else (updated_u.get("custom_title") or "Oddiy fuqaro")
 
             card_text = self.format_player_end_game_card(
                 player_tag=p.tag,
