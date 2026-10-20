@@ -2,14 +2,17 @@ name: Render 24/7 Keep Alive
 
 on:
   schedule:
-    # Run every 10 minutes to prevent Render free-tier spin down (sleeps after 15m)
+    # Har 10 daqiqada ishga tushadi (Render 15 daqiqada uxlab qolmasligi uchun)
     - cron: '*/10 * * * *'
   workflow_dispatch:
 
 jobs:
-  ping:
+  keep-alive:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping Render Service
+      - name: Ping Render Bot Service
         run: |
-          curl -s -f -m 30 "https://mafia-bot-abhf.onrender.com/ping" || echo "Ping request executed"
+          echo "Pinging Render bot web service..."
+          curl -s -L -m 45 "https://mafia-bot-abhf.onrender.com/" -o /dev/null -w "HTTP Status: %{http_code}\n"
+          curl -s -L -m 45 "https://mafia-bot-abhf.onrender.com/ping" -o /dev/null -w "Ping Status: %{http_code}\n"
+          echo "Render keep-alive ping muvaffaqiyatli bajarildi!"
