@@ -11,7 +11,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.enums import ParseMode
 from aiogram.client.default import DefaultBotProperties
 
-from config import BOT_TOKEN, WEB_HOST, WEB_PORT
+from config import BOT_TOKEN, WEB_HOST, WEB_PORT, RENDER_EXTERNAL_URL
 from database.db import db
 from database.db_sync import db_sync
 from bot.handlers import (
@@ -106,11 +106,36 @@ async def run_bot():
             logger.warning(f"⚠️ Telegram ulanish xatosi ({e}). 3 soniyadan so'ng qayta ulanadi...")
             await asyncio.sleep(3)
 
+async def run_keep_alive_ping_loop(interval_seconds: int = 480):
+    """
+    Render Free-tier 15 daqiqalik harakatsizlikdan so'ng uxlab qolmasligi uchun
+    har 8 daqiqada (480s) o'zining /ping endpointiga so'rov yuborib turadi.
+    """
+    ping_url = f"{RENDER_EXTERNAL_URL.rstrip('/')}/ping"
+    logger.info(f"🔄 Render Keep-Alive 24/7 pinger faollashtirildi: {ping_url}")
+    await asyncio.sleep(60)
+
+    while True:
+        try:
+            import urllib.request
+            req = urllib.request.Request(
+                ping_url,
+                headers={"User-Agent": "Render247KeepAlive/1.0"}
+            )
+            loop = asyncio.get_running_loop()
+            await loop.run_in_executor(None, lambda: urllib.request.urlopen(req, timeout=20))
+            logger.info("💓 Render 24/7 keep-alive ping muvaffaqiyatli yuborildi (200 OK)")
+        except Exception as e:
+            logger.warning(f"⚠️ Render keep-alive ping xatosi: {e}")
+
+        await asyncio.sleep(interval_seconds)
+
 async def main():
     logger.info("🚀 Mafia Bot va Web Admin Server ishga tushirilmoqda...")
     await asyncio.gather(
         run_bot(),
-        run_web_server()
+        run_web_server(),
+        run_keep_alive_ping_loop()
     )
 
 if __name__ == "__main__":

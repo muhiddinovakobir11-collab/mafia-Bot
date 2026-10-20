@@ -27,6 +27,7 @@ ADMIN_IDS = [8055412146]
 WEB_HOST = os.getenv("WEB_HOST", "0.0.0.0")
 WEB_PORT = int(os.getenv("PORT", os.getenv("WEB_PORT", 8000)))
 WEB_ADMIN_SECRET = os.getenv("WEB_ADMIN_SECRET", "mafia_admin_secret_8055412146")
+RENDER_EXTERNAL_URL = os.getenv("RENDER_EXTERNAL_URL", "https://mafia-bot-abhf.onrender.com")
 
 # O'yin sozlamalari
 MIN_PLAYERS = 3       # Test va tezkor boshlash uchun (odatda 4-5)

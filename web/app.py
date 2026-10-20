@@ -32,6 +32,15 @@ def require_admin(request: Request):
 
     return False
 
+@app.get("/health")
+@app.get("/ping")
+async def health_check():
+    return JSONResponse({
+        "status": "ok",
+        "service": "mafia-bot",
+        "alive": True
+    })
+
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
     return templates.TemplateResponse(request=request, name="login.html", context={"error": None})
