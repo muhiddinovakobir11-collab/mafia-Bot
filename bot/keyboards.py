@@ -6,14 +6,15 @@ from aiogram.types import (
 )
 from typing import List, Dict, Any
 
-def get_main_keyboard(is_admin: bool = False) -> ReplyKeyboardMarkup:
+def get_main_keyboard(is_admin: bool = False, lang: str = "uz") -> ReplyKeyboardMarkup:
     kb = [
         [KeyboardButton(text="🔵 👤 Profil & Balans"), KeyboardButton(text="🟣 🛍️ Do'kon & Narsalar")],
         [KeyboardButton(text="🟢 💳 Karta orqali xarid"), KeyboardButton(text="🟡 ⭐️ Stars to'ldirish")],
         [KeyboardButton(text="🏰 Mafia Klani"), KeyboardButton(text="🎰 Kazino & O'yinlar")],
         [KeyboardButton(text="🎯 Kunlik Missiyalar"), KeyboardButton(text="🎁 Kunlik bonus")],
         [KeyboardButton(text="🏆 Reyting & Top"), KeyboardButton(text="🤝 Do'stlarni taklif qilish")],
-        [KeyboardButton(text="📖 O'yin qoidalari & Rollar"), KeyboardButton(text="➕ Botni guruhga qo'shish")]
+        [KeyboardButton(text="📖 O'yin qoidalari & Rollar"), KeyboardButton(text="🌐 Tilni tanlash / Language")],
+        [KeyboardButton(text="➕ Botni guruhga qo'shish")]
     ]
     if is_admin:
         kb.append([KeyboardButton(text="🔴 ⚙️ Admin Panel")])
@@ -24,11 +25,27 @@ def get_profile_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [
             InlineKeyboardButton(text="🟣 🎒 Inventarim", callback_data="my_inventory"),
-            InlineKeyboardButton(text="🟣 🛍️ Do'konga o'tish", callback_data="open_shop")
+            InlineKeyboardButton(text="🚗 🚘 Garajim (Mashinalar)", callback_data="my_garage_cb")
+        ],
+        [
+            InlineKeyboardButton(text="🟣 🛍️ Do'konga o'tish", callback_data="open_shop"),
+            InlineKeyboardButton(text="🌐 Tilni tanlash", callback_data="open_lang_select")
         ],
         [
             InlineKeyboardButton(text="🟢 💳 Karta orqali xarid (So'm)", callback_data="buy_card_menu"),
             InlineKeyboardButton(text="🟡 ⭐️ Stars xarid", callback_data="buy_stars_menu")
+        ]
+    ])
+
+def get_language_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="🇺🇿 O'zbekcha (Lotin)", callback_data="set_lang_uz"),
+            InlineKeyboardButton(text="🇺🇿 Ўзбекча (Кирилл)", callback_data="set_lang_uz_cyrl")
+        ],
+        [
+            InlineKeyboardButton(text="🇷🇺 Русский", callback_data="set_lang_ru"),
+            InlineKeyboardButton(text="🇬🇧 English", callback_data="set_lang_en")
         ]
     ])
 
@@ -128,6 +145,10 @@ def get_admin_main_keyboard() -> InlineKeyboardMarkup:
         ],
         [
             InlineKeyboardButton(text="🟢 💰 Balans berish / olish", callback_data="adm_balance"),
+            InlineKeyboardButton(text="🚗 🚘 Mashina berish", callback_data="adm_give_car")
+        ],
+        [
+            InlineKeyboardButton(text="✏️ 🎭 Profilni tahrirlash", callback_data="adm_edit_profile"),
             InlineKeyboardButton(text="🔴 🚫 Ban / Unban", callback_data="adm_ban")
         ],
         [

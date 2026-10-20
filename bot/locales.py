@@ -1,0 +1,137 @@
+"""
+Mafia Bot — Ko'p tilli mahalliylashtirish tizimi (Localization / Multilanguage)
+Qo'llab-quvvatlanadigan tillar:
+  - 'uz': O'zbekcha (Lotin)
+  - 'uz_cyrl': Ўзбекча (Кирилл)
+  - 'ru': Русский
+  - 'en': English
+"""
+
+from typing import Dict, Any
+
+LANGUAGES = {
+    "uz": "🇺🇿 O'zbekcha",
+    "uz_cyrl": "🇺🇿 Ўзбекча",
+    "ru": "🇷🇺 Русский",
+    "en": "🇬🇧 English",
+}
+
+TEXTS: Dict[str, Dict[str, str]] = {
+    "uz": {
+        "lang_name": "🇺🇿 O'zbekcha",
+        "lang_selected": "✅ <b>Til muvaffaqiyatli tanlandi: O'zbekcha!</b>",
+        "select_lang": "🌐 <b>Iltimos, o'zingizga qulay tilni tanlang:</b>\n<i>Please select your preferred language:</i>",
+        "btn_change_lang": "🌐 Tilni tanlash",
+        "profile_title": "🎩 <b>MAFIA SHAXSIY PROFILI</b>",
+        "group_balans_title": "👤 <b>O'YINCHI BALANSI VA MA'LUMOTI</b>",
+        "full_details_btn": "👤 To'liq profil (Lichkada) ➔",
+        "sent_to_dm_hint": "📩 <i>Mashinalaringiz soni, daraja va to'liq inventar shaxsiy lichkangizga yuborildi!</i>",
+        "name": "Ism",
+        "id": "ID",
+        "vip_status": "VIP Maqom",
+        "spouse": "Jufti / Parasi",
+        "single": "Bo'ydoq",
+        "level": "Daraja",
+        "xp": "Tajriba (XP)",
+        "rep": "Obro' (Rep)",
+        "cash": "Naqd pul",
+        "bank": "Bank hisobida",
+        "diamonds": "Olmoslar",
+        "games_played": "Jami o'yinlar",
+        "games_won": "G'alabalar",
+        "garage_title": "Garajdagi mashinalar",
+        "no_cars": "Garajda mashina yo'q",
+        "inventory_title": "Maxsus anjomlar",
+        "empty_inv": "Inventar bo'sh",
+        "winrate": "G'alaba ko'rsatkichi",
+    },
+    "uz_cyrl": {
+        "lang_name": "🇺🇿 Ўзбекча",
+        "lang_selected": "✅ <b>Тил муваффақиятли танланди: Ўзбекча (Кирилл)!</b>",
+        "select_lang": "🌐 <b>Илтимос, ўзингизга қулай тилни танланг:</b>\n<i>Пожалуйста, выберите язык:</i>",
+        "btn_change_lang": "🌐 Тилни танлаш",
+        "profile_title": "🎩 <b>МАФИЯ ШАХСИЙ ПРОФИЛИ</b>",
+        "group_balans_title": "👤 <b>ЎЙИНЧИ БАЛАНСИ ВА МАЪЛУМОТИ</b>",
+        "full_details_btn": "👤 Тўлиқ профил (Личкада) ➔",
+        "sent_to_dm_hint": "📩 <i>Машиналарингиз сони, даража ва тўлиқ инвентар шахсий личкангизга юборилди!</i>",
+        "name": "Исм",
+        "id": "ID",
+        "vip_status": "VIP Мақом",
+        "spouse": "Жуфти / Параси",
+        "single": "Бўйдоқ",
+        "level": "Даража",
+        "xp": "Тажриба (XP)",
+        "rep": "Обрў (Реп)",
+        "cash": "Нақд пул",
+        "bank": "Банк ҳисобида",
+        "diamonds": "Олмослар",
+        "games_played": "Жами ўйинлар",
+        "games_won": "Ғалабалар",
+        "garage_title": "Гараждаги машиналар",
+        "no_cars": "Гаражда машина йўқ",
+        "inventory_title": "Махсус анжомлар",
+        "empty_inv": "Инвентар бўш",
+        "winrate": "Ғалаба кўрсаткичи",
+    },
+    "ru": {
+        "lang_name": "🇷🇺 Русский",
+        "lang_selected": "✅ <b>Язык успешно изменен на: Русский!</b>",
+        "select_lang": "🌐 <b>Пожалуйста, выберите удобный язык:</b>\n<i>Please select your preferred language:</i>",
+        "btn_change_lang": "🌐 Сменить язык",
+        "profile_title": "🎩 <b>ПРОФИЛЬ ИГРОКА МАФИИ</b>",
+        "group_balans_title": "👤 <b>БАЛАНС И СТАТУС ИГРОКА</b>",
+        "full_details_btn": "👤 Полный профиль (В ЛС) ➔",
+        "sent_to_dm_hint": "📩 <i>Количество ваших машин, уровень и инвентарь отправлены в личные сообщения!</i>",
+        "name": "Имя",
+        "id": "ID",
+        "vip_status": "VIP Статус",
+        "spouse": "Супруг(а) / Пара",
+        "single": "Холост(а)",
+        "level": "Уровень",
+        "xp": "Опыт (XP)",
+        "rep": "Авторитет (Реп)",
+        "cash": "Наличные",
+        "bank": "В банке",
+        "diamonds": "Алмазы",
+        "games_played": "Всего игр",
+        "games_won": "Побед",
+        "garage_title": "Машины в гараже",
+        "no_cars": "В гараже пусто",
+        "inventory_title": "Спец. предметы",
+        "empty_inv": "Инвентарь пуст",
+        "winrate": "Винрейт",
+    },
+    "en": {
+        "lang_name": "🇬🇧 English",
+        "lang_selected": "✅ <b>Language successfully set to: English!</b>",
+        "select_lang": "🌐 <b>Please choose your preferred language:</b>",
+        "btn_change_lang": "🌐 Change Language",
+        "profile_title": "🎩 <b>MAFIA PLAYER PROFILE</b>",
+        "group_balans_title": "👤 <b>PLAYER BALANCE & DETAILS</b>",
+        "full_details_btn": "👤 View Full Profile (in DM) ➔",
+        "sent_to_dm_hint": "📩 <i>Your cars count, full inventory and level details have been sent to your private chat!</i>",
+        "name": "Name",
+        "id": "ID",
+        "vip_status": "VIP Status",
+        "spouse": "Partner / Spouse",
+        "single": "Single",
+        "level": "Level",
+        "xp": "Experience (XP)",
+        "rep": "Reputation (Rep)",
+        "cash": "Cash",
+        "bank": "In Bank",
+        "diamonds": "Diamonds",
+        "games_played": "Total Games",
+        "games_won": "Victories",
+        "garage_title": "Garage Vehicles",
+        "no_cars": "Garage is empty",
+        "inventory_title": "Special Items",
+        "empty_inv": "Inventory is empty",
+        "winrate": "Win Rate",
+    }
+}
+
+def get_text(key: str, lang: str = "uz") -> str:
+    """Belgilangan tildagi matnni qaytaradi. Topilmasa 'uz' tilidan olinadi."""
+    lang_dict = TEXTS.get(lang) or TEXTS["uz"]
+    return lang_dict.get(key) or TEXTS["uz"].get(key, key)

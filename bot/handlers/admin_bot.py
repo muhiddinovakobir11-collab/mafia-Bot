@@ -20,6 +20,10 @@ class AdminFSM(StatesGroup):
     waiting_for_broadcast_text = State()
     waiting_for_star_price = State()
     waiting_for_item_price = State()
+    waiting_for_car_user_id = State()
+    waiting_for_car_qty = State()
+    waiting_for_edit_user_id = State()
+    waiting_for_edit_value = State()
 
 def is_admin(user_id: int) -> bool:
     return user_id in ADMIN_IDS
@@ -610,6 +614,313 @@ async def adm_save_item_delta(call: CallbackQuery):
             await call.answer(f"💎 Yangi narx: {new_price} Almaz!")
         await adm_shop_item_details(call)
 
+# --- 6.1 CAR GRANTING WITH BUTTONS ---
+
+ADMIN_CARS = [
+    ("mashina_matiz", "🚗 Daewoo Matiz", "10%"),
+    ("mashina_nexia", "🚙 Daewoo Nexia 2", "12%"),
+    ("mashina_gentra", "🚙 Chevrolet Gentra", "15%"),
+    ("mashina_monza", "🚗 Chevrolet Monza", "18%"),
+    ("mashina_kaban", "🚘 Mercedes W140 Kaban", "20%"),
+    ("mashina_malibu", "🚔 Chevrolet Malibu 2", "25%"),
+    ("mashina_bmw", "🏎️ BMW M5 F90", "30%"),
+    ("mashina_gelik", "🚙 Mercedes G63 Gelik", "35%"),
+    ("mashina_porsche", "🏎️ Porsche 911 Turbo S", "40%"),
+    ("mashina_rolls", "👑 Rolls-Royce Phantom", "50%"),
+]
+
+def get_cars_selection_keyboard(target_id: int) -> InlineKeyboardMarkup:
+    buttons = []
+    row = []
+    for code, name, _ in ADMIN_CARS:
+        row.append(InlineKeyboardButton(text=name, callback_data=f"adm_givecar_{target_id}_{code}"))
+        if len(row) == 2:
+            buttons.append(row)
+            row = []
+    if row:
+        buttons.append(row)
+    buttons.append([InlineKeyboardButton(text="🔙 Orqaga", callback_data="adm_give_car")])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+def get_car_qty_keyboard(target_id: int, car_code: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="1 ta 🚗", callback_data=f"adm_carqty_{target_id}_{car_code}_1"),
+            InlineKeyboardButton(text="2 ta 🚗", callback_data=f"adm_carqty_{target_id}_{car_code}_2"),
+            InlineKeyboardButton(text="3 ta 🚗", callback_data=f"adm_carqty_{target_id}_{car_code}_3"),
+        ],
+        [
+            InlineKeyboardButton(text="5 ta 🚗", callback_data=f"adm_carqty_{target_id}_{car_code}_5"),
+            InlineKeyboardButton(text="10 ta 🚗", callback_data=f"adm_carqty_{target_id}_{car_code}_10"),
+            InlineKeyboardButton(text="✍️ Boshqa son", callback_data=f"adm_carqty_custom_{target_id}_{car_code}")
+        ],
+        [
+            InlineKeyboardButton(text="🔙 Mashinalar ro'yxatiga", callback_data=f"adm_pickcar_{target_id}")
+        ]
+    ])
+
+async def apply_give_car(event, bot, admin_id: int, target_id: int, car_code: str, qty: int):
+    await db.add_inventory_item(target_id, car_code, qty)
+    user = await db.get_user(target_id)
+    car_name = next((name for c, name, _ in ADMIN_CARS if c == car_code), car_code)
+    u_name = user["full_name"] if user else f"ID: {target_id}"
+
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🚗 Yana mashina berish", callback_data=f"adm_pickcar_{target_id}")],
+        [InlineKeyboardButton(text="⚙️ Asosiy panel", callback_data="adm_back")]
+    ])
+
+    text = (
+        f"✅ <b>MASHINA MUVAFFAQIYATLI BERILDI!</b> 🚗\n\n"
+        f"👤 O'yinchi: <b>{u_name}</b> (<code>{target_id}</code>)\n"
+        f"🚘 Mashina: <b>{car_name}</b>\n"
+        f"🔢 Miqdor: <b>{qty} dona</b>\n\n"
+        f"✨ O'yinchining garajiga muvaffaqiyatli qo'shildi!"
+    )
+    if isinstance(event, CallbackQuery):
+        await event.message.edit_text(text, reply_markup=kb, parse_mode="HTML")
+    elif hasattr(event, "edit_text"):
+        try:
+            await event.edit_text(text, reply_markup=kb, parse_mode="HTML")
+        except Exception:
+            await event.answer(text, reply_markup=kb, parse_mode="HTML")
+    else:
+        await event.answer(text, reply_markup=kb, parse_mode="HTML")
+
+    if target_id != admin_id:
+        try:
+            await bot.send_message(
+                target_id,
+                f"🎁 <b>TABRIKLAYMIZ! SOVG'A OLINDI!</b>\n\n"
+                f"Bosh Administrator sizning hisobingizga <b>{qty} dona {car_name}</b> sovg'a qildi! 🚗💨\n\n"
+                f"Garajingizni ko'rish uchun profilingizga kiring.",
+                parse_mode="HTML"
+            )
+        except Exception:
+            pass
+
+@router.callback_query(F.data == "adm_give_car")
+async def adm_give_car_menu(call: CallbackQuery, state: FSMContext):
+    if not is_admin(call.from_user.id):
+        return
+    await state.clear()
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=f"👤 O'zimga ({call.from_user.id})", callback_data=f"adm_pickcar_{call.from_user.id}")],
+        [InlineKeyboardButton(text="✍️ Boshqa foydalanuvchi ID sini kiritish", callback_data="adm_car_custom_user")],
+        [InlineKeyboardButton(text="🔙 Asosiy panel", callback_data="adm_back")]
+    ])
+    await call.message.edit_text(
+        "🚗 <b>FOYDALANUVCHIGA MASHINA BERISH</b>\n\n"
+        "Kimning garajiga mashina qo'shmoqchisiz?",
+        reply_markup=kb,
+        parse_mode="HTML"
+    )
+    await call.answer()
+
+@router.callback_query(F.data == "adm_car_custom_user")
+async def adm_car_ask_user_id(call: CallbackQuery, state: FSMContext):
+    if not is_admin(call.from_user.id):
+        return
+    await state.set_state(AdminFSM.waiting_for_car_user_id)
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🔙 Bekor qilish", callback_data="adm_give_car")]
+    ])
+    await call.message.edit_text(
+        "✍️ <b>Mashina beriladigan foydalanuvchining Telegram ID sini yuboring:</b>",
+        reply_markup=kb,
+        parse_mode="HTML"
+    )
+    await call.answer()
+
+@router.callback_query(F.data.startswith("adm_pickcar_"))
+async def adm_pick_car_cb(call: CallbackQuery):
+    if not is_admin(call.from_user.id):
+        return
+    target_id = int(call.data.replace("adm_pickcar_", ""))
+    user = await db.get_user(target_id)
+    if not user:
+        await call.answer("Foydalanuvchi topilmadi!", show_alert=True)
+        return
+    u_name = user["full_name"]
+    await call.message.edit_text(
+        f"🚗 <b>{u_name}</b> (<code>{target_id}</code>) uchun mashina tanlang:\n\n"
+        f"Quyidagi mashinalardan birini bosing:",
+        reply_markup=get_cars_selection_keyboard(target_id),
+        parse_mode="HTML"
+    )
+    await call.answer()
+
+@router.callback_query(F.data.startswith("adm_givecar_"))
+async def adm_select_car_qty_cb(call: CallbackQuery):
+    if not is_admin(call.from_user.id):
+        return
+    rest = call.data.replace("adm_givecar_", "")
+    target_id_str, car_code = rest.split("_", 1)
+    target_id = int(target_id_str)
+
+    car_name = next((name for c, name, _ in ADMIN_CARS if c == car_code), car_code)
+    u = await db.get_user(target_id)
+    u_name = u["full_name"] if u else f"ID: {target_id}"
+
+    await call.message.edit_text(
+        f"🚘 Tanlandi: <b>{car_name}</b>\n"
+        f"👤 Qabul qiluvchi: <b>{u_name}</b> (<code>{target_id}</code>)\n\n"
+        f"Nechta dona bermoqchisiz? Tanlang yoki sonini yozing:",
+        reply_markup=get_car_qty_keyboard(target_id, car_code),
+        parse_mode="HTML"
+    )
+    await call.answer()
+
+@router.callback_query(F.data.startswith("adm_carqty_"))
+async def adm_grant_car_cb(call: CallbackQuery, state: FSMContext):
+    if not is_admin(call.from_user.id):
+        return
+    data_str = call.data.replace("adm_carqty_", "")
+    if data_str.startswith("custom_"):
+        rest = data_str.replace("custom_", "")
+        target_id_str, car_code = rest.split("_", 1)
+        target_id = int(target_id_str)
+        await state.set_state(AdminFSM.waiting_for_car_qty)
+        await state.update_data(car_target_id=target_id, car_code=car_code)
+        kb = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🔙 Bekor qilish", callback_data=f"adm_givecar_{target_id}_{car_code}")]
+        ])
+        await call.message.edit_text(
+            "✍️ <b>Nechta mashina bermoqchisiz? Son ko'rinishida yozing:</b>\n<i>(Masalan: 1 yoki 5)</i>",
+            reply_markup=kb,
+            parse_mode="HTML"
+        )
+        await call.answer()
+        return
+
+    target_and_car, _, qty_str = data_str.rpartition("_")
+    target_id_str, car_code = target_and_car.split("_", 1)
+    target_id = int(target_id_str)
+    qty = int(qty_str)
+
+    await apply_give_car(call, call.bot, call.from_user.id, target_id, car_code, qty)
+    await call.answer("✅ Mashina berildi!", show_alert=True)
+
+# --- 6.2 PROFILE EDITING WITH BUTTONS ---
+
+async def display_user_profile_edit_menu(event, target_id: int):
+    import time
+    user = await db.get_user(target_id)
+    if not user:
+        if isinstance(event, CallbackQuery):
+            await event.answer("Foydalanuvchi topilmadi!", show_alert=True)
+        return
+
+    custom_title = user.get("custom_title") or "Oddiy fuqaro"
+    rep = user.get("rep") or 0
+    vip_until = user.get("vip_until") or 0
+    vip_str = "Yo'q"
+    if vip_until > time.time():
+        rem_days = max(1, int((vip_until - time.time()) / 86400))
+        vip_str = f"👑 {rem_days} kun qoldi"
+
+    text = (
+        f"✏️ <b>FOYDALANUVCHI PROFILINI TAHRIRLASH:</b>\n\n"
+        f"👤 <b>Ism:</b> <b>{user['full_name']}</b> (@{user['username'] or 'yoq'})\n"
+        f"🆔 <b>ID:</b> <code>{user['id']}</code>\n"
+        f"🏷️ <b>Unvon / Maqom:</b> <b>{custom_title}</b>\n"
+        f"⭐ <b>Daraja:</b> <b>{user['level']}-daraja</b>\n"
+        f"⚡ <b>Tajriba (XP):</b> <b>{user['xp']:,} XP</b>\n"
+        f"🌟 <b>Obro' (Rep):</b> <b>{rep} ball</b>\n"
+        f"👑 <b>VIP Holati:</b> <b>{vip_str}</b>\n\n"
+        f"<i>O'zgartirmoqchi bo'lgan parametr tugmasini bosing:</i>"
+    )
+
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="🏷️ Unvon / Maqom", callback_data=f"admedit_f_{target_id}_title"),
+            InlineKeyboardButton(text="⭐ Daraja (Level)", callback_data=f"admedit_f_{target_id}_level")
+        ],
+        [
+            InlineKeyboardButton(text="⚡ Tajriba (XP)", callback_data=f"admedit_f_{target_id}_xp"),
+            InlineKeyboardButton(text="🌟 Obro' (Rep)", callback_data=f"admedit_f_{target_id}_rep")
+        ],
+        [
+            InlineKeyboardButton(text="👑 VIP Kunlar berish", callback_data=f"admedit_f_{target_id}_vip"),
+            InlineKeyboardButton(text="👤 Ismni o'zgartirish", callback_data=f"admedit_f_{target_id}_name")
+        ],
+        [
+            InlineKeyboardButton(text="🔙 Admin panel", callback_data="adm_back")
+        ]
+    ])
+
+    if isinstance(event, CallbackQuery):
+        await event.message.edit_text(text, reply_markup=kb, parse_mode="HTML")
+        await event.answer()
+    else:
+        await event.answer(text, reply_markup=kb, parse_mode="HTML")
+
+@router.callback_query(F.data == "adm_edit_profile")
+async def adm_edit_profile_menu(call: CallbackQuery, state: FSMContext):
+    if not is_admin(call.from_user.id):
+        return
+    await state.clear()
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=f"👤 O'z profilim ({call.from_user.id})", callback_data=f"adm_eduser_{call.from_user.id}")],
+        [InlineKeyboardButton(text="✍️ Boshqa foydalanuvchi ID sini kiritish", callback_data="adm_edit_custom_user")],
+        [InlineKeyboardButton(text="🔙 Asosiy panel", callback_data="adm_back")]
+    ])
+    await call.message.edit_text(
+        "✏️ <b>PROFILNI TAHRIRLASH (ADMIN)</b>\n\n"
+        "Kimning profilini tahrirlamoqchisiz?",
+        reply_markup=kb,
+        parse_mode="HTML"
+    )
+    await call.answer()
+
+@router.callback_query(F.data == "adm_edit_custom_user")
+async def adm_edit_ask_user_id(call: CallbackQuery, state: FSMContext):
+    if not is_admin(call.from_user.id):
+        return
+    await state.set_state(AdminFSM.waiting_for_edit_user_id)
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🔙 Bekor qilish", callback_data="adm_edit_profile")]
+    ])
+    await call.message.edit_text(
+        "✍️ <b>Tahrirlanadigan foydalanuvchining Telegram ID sini yuboring:</b>",
+        reply_markup=kb,
+        parse_mode="HTML"
+    )
+    await call.answer()
+
+@router.callback_query(F.data.startswith("adm_eduser_"))
+async def adm_eduser_cb(call: CallbackQuery):
+    if not is_admin(call.from_user.id):
+        return
+    target_id = int(call.data.replace("adm_eduser_", ""))
+    await display_user_profile_edit_menu(call, target_id)
+
+@router.callback_query(F.data.startswith("admedit_f_"))
+async def adm_edit_field_cb(call: CallbackQuery, state: FSMContext):
+    if not is_admin(call.from_user.id):
+        return
+    parts = call.data.split("_")
+    target_id = int(parts[2])
+    field = parts[3]
+
+    await state.set_state(AdminFSM.waiting_for_edit_value)
+    await state.update_data(edit_target_id=target_id, edit_field=field)
+
+    prompts = {
+        "title": "🏷️ <b>Yangi unvon / maqomni yozib yuboring:</b>\n<i>(Masalan: 👑 Don Karleone, 🎩 Shahar Hokimi, 🕶️ Mafioz)</i>",
+        "level": "⭐ <b>Yangi daraja (Level) raqamini kiriting:</b>\n<i>(Masalan: 5, 10, 50)</i>",
+        "xp": "⚡ <b>Yangi XP miqdorini kiriting:</b>\n<i>(Masalan: 2500)</i>",
+        "rep": "🌟 <b>Yangi Obro' (Rep) ballini kiriting:</b>\n<i>(Masalan: 25)</i>",
+        "vip": "👑 <b>Necha kunlik VIP status berilsin?</b>\n<i>(Masalan: 7, 30 yoki 0 - VIPni bekor qilish)</i>",
+        "name": "👤 <b>Foydalanuvchining yangi ismini kiriting:</b>"
+    }
+
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🔙 Bekor qilish", callback_data=f"adm_eduser_{target_id}")]
+    ])
+    await call.message.edit_text(prompts.get(field, "Qiymatni kiriting:"), reply_markup=kb, parse_mode="HTML")
+    await call.answer()
+
 # --- 7. BROADCAST WITH CONFIRMATION BUTTON ---
 
 @router.callback_query(F.data == "adm_broadcast")
@@ -775,6 +1086,99 @@ async def fsm_received_broadcast(message: Message, state: FSMContext):
         reply_markup=kb
     )
     await state.clear()
+
+@router.message(AdminFSM.waiting_for_car_user_id)
+async def fsm_received_car_user_id(message: Message, state: FSMContext):
+    if not is_admin(message.from_user.id):
+        return
+    text = message.text.strip()
+    if not text.isdigit():
+        await message.answer("⚠️ Iltimos, faqat raqamlardan iborat Telegram ID yuboring!")
+        return
+    target_id = int(text)
+    user = await db.get_user(target_id)
+    if not user:
+        await message.answer(f"❌ ID <code>{target_id}</code> bo'yicha foydalanuvchi topilmadi!", parse_mode="HTML")
+        await state.clear()
+        return
+    await state.clear()
+    await message.answer(
+        f"🚗 <b>{user['full_name']}</b> (<code>{target_id}</code>) uchun mashina tanlang:\n\n"
+        f"Quyidagi mashinalardan birini bosing:",
+        reply_markup=get_cars_selection_keyboard(target_id),
+        parse_mode="HTML"
+    )
+
+@router.message(AdminFSM.waiting_for_car_qty)
+async def fsm_received_car_qty(message: Message, state: FSMContext):
+    if not is_admin(message.from_user.id):
+        return
+    text = message.text.strip()
+    if not text.isdigit() or int(text) <= 0:
+        await message.answer("⚠️ Iltimos, musbat butun son kiriting (masalan: 1, 2, 5)!")
+        return
+    qty = int(text)
+    data = await state.get_data()
+    target_id = data.get("car_target_id", message.from_user.id)
+    car_code = data.get("car_code", "mashina_matiz")
+    await state.clear()
+    await apply_give_car(message, message.bot, message.from_user.id, target_id, car_code, qty)
+
+@router.message(AdminFSM.waiting_for_edit_user_id)
+async def fsm_received_edit_user_id(message: Message, state: FSMContext):
+    if not is_admin(message.from_user.id):
+        return
+    text = message.text.strip()
+    if not text.isdigit():
+        await message.answer("⚠️ Iltimos, faqat raqamlardan iborat Telegram ID yuboring!")
+        return
+    target_id = int(text)
+    user = await db.get_user(target_id)
+    if not user:
+        await message.answer(f"❌ ID <code>{target_id}</code> bo'yicha foydalanuvchi topilmadi!", parse_mode="HTML")
+        await state.clear()
+        return
+    await state.clear()
+    await display_user_profile_edit_menu(message, target_id)
+
+@router.message(AdminFSM.waiting_for_edit_value)
+async def fsm_received_edit_value(message: Message, state: FSMContext):
+    if not is_admin(message.from_user.id):
+        return
+
+    data = await state.get_data()
+    target_id = data.get("edit_target_id")
+    field = data.get("edit_field")
+    val_text = message.text.strip()
+
+    if not target_id or not field:
+        await state.clear()
+        return
+
+    kwargs = {}
+    if field in ["level", "xp", "rep", "vip"]:
+        if not (val_text.isdigit() or (val_text.startswith("-") and val_text[1:].isdigit())):
+            await message.answer("⚠️ Iltimos, faqat butun son kiriting!")
+            return
+        num = int(val_text)
+        if field == "level":
+            kwargs["level"] = max(1, num)
+        elif field == "xp":
+            kwargs["xp"] = max(0, num)
+        elif field == "rep":
+            kwargs["rep"] = num
+        elif field == "vip":
+            kwargs["vip_days"] = num
+    elif field == "title":
+        kwargs["custom_title"] = val_text
+    elif field == "name":
+        kwargs["full_name"] = val_text
+
+    await db.edit_user_profile(target_id, **kwargs)
+    await state.clear()
+
+    await message.answer("✅ <b>Foydalanuvchi ma'lumotlari muvaffaqiyatli saqlandi!</b>", parse_mode="HTML")
+    await display_user_profile_edit_menu(message, target_id)
 
 # --- WEB PANEL LINK ---
 

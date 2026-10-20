@@ -1,5 +1,6 @@
 import os
 import random
+from typing import Optional
 from pathlib import Path
 from fastapi import FastAPI, Request, Form, Depends, HTTPException, status, Body
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
@@ -88,10 +89,24 @@ async def admin_dashboard(request: Request, q: str = ""):
             "alive_count": len(room.get_alive_players())
         })
 
+    cars = [
+        {"code": "mashina_matiz", "name": "Daewoo Matiz ('Tezkor')"},
+        {"code": "mashina_nexia", "name": "Daewoo Nexia 2 ('Xalqona')"},
+        {"code": "mashina_gentra", "name": "Chevrolet Gentra ('Qora Gentra')"},
+        {"code": "mashina_monza", "name": "Chevrolet Monza"},
+        {"code": "mashina_kaban", "name": "Mercedes W140 ('Kaban')"},
+        {"code": "mashina_malibu", "name": "Chevrolet Malibu 2 ('Black Edition')"},
+        {"code": "mashina_bmw", "name": "BMW M5 F90"},
+        {"code": "mashina_gelik", "name": "Mercedes-Benz G63 ('Gelik')"},
+        {"code": "mashina_porsche", "name": "Porsche 911 Turbo S"},
+        {"code": "mashina_rolls", "name": "Rolls-Royce Phantom ('Don Karleone')"},
+    ]
+
     return templates.TemplateResponse(request=request, name="index.html", context={
         "stats": stats,
         "users": users,
         "items": items,
+        "cars": cars,
         "star_pkgs": star_pkgs,
         "card_pkgs": card_pkgs,
         "card_txs": card_txs,
@@ -115,6 +130,42 @@ async def update_user_balance(
 
     await db.set_balance(user_id, pul=pul, almaz=almaz)
     return RedirectResponse(url=f"/?msg=Foydalanuvchi+{user_id}+balansi+yangilandi", status_code=status.HTTP_302_FOUND)
+
+@app.post("/user/give_car")
+async def web_give_car(
+    request: Request,
+    user_id: int = Form(...),
+    car_code: str = Form(...),
+    quantity: int = Form(1)
+):
+    if not require_admin(request):
+        raise HTTPException(status_code=403, detail="Ruxsat berilmagan")
+
+    await db.add_inventory_item(user_id, car_code, max(1, quantity))
+    return RedirectResponse(url=f"/?msg=Foydalanuvchi+{user_id}+ga+mashina+muvaffaqiyatli+berildi", status_code=status.HTTP_302_FOUND)
+
+@app.post("/user/edit_profile")
+async def web_edit_profile(
+    request: Request,
+    user_id: int = Form(...),
+    custom_title: Optional[str] = Form(None),
+    level: Optional[int] = Form(None),
+    xp: Optional[int] = Form(None),
+    rep: Optional[int] = Form(None),
+    vip_days: Optional[int] = Form(None)
+):
+    if not require_admin(request):
+        raise HTTPException(status_code=403, detail="Ruxsat berilmagan")
+
+    await db.edit_user_profile(
+        user_id=user_id,
+        custom_title=custom_title,
+        level=level,
+        xp=xp,
+        rep=rep,
+        vip_days=vip_days
+    )
+    return RedirectResponse(url=f"/?msg=Foydalanuvchi+{user_id}+profili+yangilandi", status_code=status.HTTP_302_FOUND)
 
 @app.post("/user/toggle_ban")
 async def toggle_user_ban(request: Request, user_id: int = Form(...), ban_status: int = Form(...)):

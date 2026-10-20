@@ -263,16 +263,24 @@
                                     <span class="bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-lg border border-emerald-500/30 text-[10px] font-bold">✅ FAOL</span>
                                     {% endif %}
                                 </td>
-                                <td class="py-3 px-4 text-right space-x-2">
+                                <td class="py-3 px-4 text-right space-x-1 whitespace-nowrap">
                                     <button onclick="openBalanceModal({{ u.id }}, '{{ u.full_name | escape }}', {{ u.pul }}, {{ u.almaz }})"
-                                            class="btn btn-info px-2.5 py-1 rounded-lg text-xs font-semibold">
-                                        ✏️ Balans
+                                            class="btn btn-info px-2 py-1 rounded-lg text-xs font-semibold" title="Balans">
+                                        💰 Balans
+                                    </button>
+                                    <button onclick="openGiveCarModal({{ u.id }}, '{{ u.full_name | escape }}')"
+                                            class="btn btn-warning px-2 py-1 rounded-lg text-xs font-semibold" title="Mashina berish">
+                                        🚗 Mashina
+                                    </button>
+                                    <button onclick="openEditProfileModal({{ u.id }}, '{{ u.full_name | escape }}', '{{ u.custom_title or '' }}', {{ u.level }}, {{ u.xp }}, {{ u.rep or 0 }})"
+                                            class="btn btn-purple px-2 py-1 rounded-lg text-xs font-semibold" title="Profil tahrirlash">
+                                        ✏️ Profil
                                     </button>
                                     <form action="/user/toggle_ban" method="POST" class="inline">
                                         <input type="hidden" name="user_id" value="{{ u.id }}">
                                         <input type="hidden" name="ban_status" value="{{ 0 if u.is_banned else 1 }}">
                                         <button type="submit"
-                                                class="btn {{ 'btn-success' if u.is_banned else 'btn-danger' }} px-2.5 py-1 rounded-lg text-xs font-semibold">
+                                                class="btn {{ 'btn-success' if u.is_banned else 'btn-danger' }} px-2 py-1 rounded-lg text-xs font-semibold">
                                             {{ '✅ Unban' if u.is_banned else '🚫 Ban' }}
                                         </button>
                                     </form>
@@ -690,6 +698,103 @@
         </div>
     </div>
 
+    <!-- Give Car Modal -->
+    <div id="giveCarModal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+        <div class="glass-card w-full max-w-md p-6 rounded-2xl border border-amber-500/30 space-y-4">
+            <div class="flex items-center justify-between border-b border-purple-500/20 pb-3">
+                <h3 class="font-bold text-sm text-white flex items-center gap-2">
+                    🚗 Mashina berish: <span id="modalCarUserName" class="text-amber-400"></span>
+                </h3>
+                <button onclick="closeGiveCarModal()" class="text-purple-400 hover:text-white text-lg">&times;</button>
+            </div>
+
+            <form action="/user/give_car" method="POST" class="space-y-4">
+                <input type="hidden" id="modalCarUserId" name="user_id">
+
+                <div>
+                    <label class="block text-xs text-purple-300 mb-1">Mashina modeli 🚘</label>
+                    <select name="car_code" required class="w-full px-3 py-2 rounded-xl bg-purple-950/60 border border-purple-500/30 text-white text-xs">
+                        {% for c in cars %}
+                        <option value="{{ c.code }}">{{ c.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs text-purple-300 mb-1">Miqdori (dona) 🔢</label>
+                    <input type="number" name="quantity" value="1" min="1" max="100" required
+                           class="w-full px-3 py-2 rounded-xl bg-purple-950/60 border border-purple-500/30 text-white text-xs">
+                </div>
+
+                <div class="flex items-center gap-2 pt-2">
+                    <button type="button" onclick="closeGiveCarModal()" class="btn btn-secondary w-1/2 py-2 rounded-xl text-xs">
+                        Bekor qilish
+                    </button>
+                    <button type="submit" class="btn btn-warning w-1/2 py-2 rounded-xl text-xs">
+                        Mashinani berish 🚗
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Profile Modal -->
+    <div id="editProfileModal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+        <div class="glass-card w-full max-w-md p-6 rounded-2xl border border-purple-500/30 space-y-4">
+            <div class="flex items-center justify-between border-b border-purple-500/20 pb-3">
+                <h3 class="font-bold text-sm text-white flex items-center gap-2">
+                    ✏️ Profilni tahrirlash: <span id="modalEditUserName" class="text-purple-300"></span>
+                </h3>
+                <button onclick="closeEditProfileModal()" class="text-purple-400 hover:text-white text-lg">&times;</button>
+            </div>
+
+            <form action="/user/edit_profile" method="POST" class="space-y-3">
+                <input type="hidden" id="modalEditUserId" name="user_id">
+
+                <div>
+                    <label class="block text-xs text-purple-300 mb-1">Unvon / Maqom (custom title) 🏷️</label>
+                    <input type="text" id="modalEditTitle" name="custom_title" placeholder="Masalan: Don Karleone, Mergan"
+                           class="w-full px-3 py-2 rounded-xl bg-purple-950/60 border border-purple-500/30 text-white text-xs">
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-xs text-purple-300 mb-1">Daraja (Level) ⭐</label>
+                        <input type="number" id="modalEditLevel" name="level" min="1"
+                               class="w-full px-3 py-2 rounded-xl bg-purple-950/60 border border-purple-500/30 text-white text-xs">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-purple-300 mb-1">Tajriba (XP) ⚡</label>
+                        <input type="number" id="modalEditXp" name="xp" min="0"
+                               class="w-full px-3 py-2 rounded-xl bg-purple-950/60 border border-purple-500/30 text-white text-xs">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-xs text-purple-300 mb-1">Obro' (Rep) 🌟</label>
+                        <input type="number" id="modalEditRep" name="rep"
+                               class="w-full px-3 py-2 rounded-xl bg-purple-950/60 border border-purple-500/30 text-white text-xs">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-purple-300 mb-1">VIP (qo'shiladigan kun) 👑</label>
+                        <input type="number" id="modalEditVip" name="vip_days" value="0" min="0"
+                               class="w-full px-3 py-2 rounded-xl bg-purple-950/60 border border-purple-500/30 text-white text-xs">
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2 pt-2">
+                    <button type="button" onclick="closeEditProfileModal()" class="btn btn-secondary w-1/2 py-2 rounded-xl text-xs">
+                        Bekor qilish
+                    </button>
+                    <button type="submit" class="btn btn-purple w-1/2 py-2 rounded-xl text-xs">
+                        Saqlash 💾
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script>
         function switchTab(tabName) {
             const tabs = ['users', 'stars', 'shop', 'exchange', 'games', 'cards'];
@@ -724,6 +829,31 @@
 
         function closeBalanceModal() {
             document.getElementById('balanceModal').classList.add('hidden');
+        }
+
+        function openGiveCarModal(userId, userName) {
+            document.getElementById('modalCarUserId').value = userId;
+            document.getElementById('modalCarUserName').innerText = userName + ' (ID: ' + userId + ')';
+            document.getElementById('giveCarModal').classList.remove('hidden');
+        }
+
+        function closeGiveCarModal() {
+            document.getElementById('giveCarModal').classList.add('hidden');
+        }
+
+        function openEditProfileModal(userId, userName, customTitle, level, xp, rep) {
+            document.getElementById('modalEditUserId').value = userId;
+            document.getElementById('modalEditUserName').innerText = userName + ' (ID: ' + userId + ')';
+            document.getElementById('modalEditTitle').value = customTitle || '';
+            document.getElementById('modalEditLevel').value = level || 1;
+            document.getElementById('modalEditXp').value = xp || 0;
+            document.getElementById('modalEditRep').value = rep || 0;
+            document.getElementById('modalEditVip').value = 0;
+            document.getElementById('editProfileModal').classList.remove('hidden');
+        }
+
+        function closeEditProfileModal() {
+            document.getElementById('editProfileModal').classList.add('hidden');
         }
     </script>
 </body>

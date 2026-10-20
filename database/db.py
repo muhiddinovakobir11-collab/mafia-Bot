@@ -101,6 +101,7 @@ class Database:
                 ("bank_pul", "INTEGER DEFAULT 0"),
                 ("spouse_id", "INTEGER DEFAULT 0"),
                 ("car", "TEXT DEFAULT ''"),
+                ("language", "TEXT DEFAULT 'uz'"),
             ]:
                 try:
                     await db.execute(f"ALTER TABLE users ADD COLUMN {col} {col_type};")
@@ -539,6 +540,78 @@ class Database:
             "current_xp": current_xp,
             "needed_xp": xp_for_level(current_level)
         }
+
+    async def set_user_language(self, user_id: int, language: str) -> bool:
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute("UPDATE users SET language = ? WHERE id = ?;", (language, user_id))
+            await db.commit()
+            return True
+
+    async def get_user_language(self, user_id: int) -> str:
+        user = await self.get_user(user_id)
+        if user and user.get("language"):
+            return user["language"]
+        return "uz"
+
+    async def edit_user_profile(
+        self,
+        user_id: int,
+        full_name: Optional[str] = None,
+        custom_title: Optional[str] = None,
+        level: Optional[int] = None,
+        xp: Optional[int] = None,
+        rep: Optional[int] = None,
+        vip_days: Optional[int] = None,
+        pul: Optional[int] = None,
+        almaz: Optional[int] = None
+    ) -> bool:
+        user = await self.get_user(user_id)
+        if not user:
+            return False
+
+        fields = []
+        params = []
+        if full_name is not None and full_name.strip():
+            fields.append("full_name = ?")
+            params.append(full_name.strip())
+        if custom_title is not None:
+            fields.append("custom_title = ?")
+            params.append(custom_title.strip())
+        if level is not None:
+            fields.append("level = ?")
+            params.append(level)
+        if xp is not None:
+            fields.append("xp = ?")
+            params.append(xp)
+        if rep is not None:
+            fields.append("rep = ?")
+            params.append(rep)
+        if pul is not None:
+            fields.append("pul = ?")
+            params.append(pul)
+        if almaz is not None:
+            fields.append("almaz = ?")
+            params.append(almaz)
+        if vip_days is not None:
+            now = int(time.time())
+            current_vip = user.get("vip_until") or 0
+            base = max(now, current_vip)
+            new_vip = base + (vip_days * 86400) if vip_days > 0 else 0
+            fields.append("vip_until = ?")
+            params.append(new_vip)
+
+        if not fields:
+            return True
+
+        params.append(user_id)
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute(f"UPDATE users SET {', '.join(fields)} WHERE id = ?;", params)
+            await db.commit()
+            return True
+
+    async def get_user_cars(self, user_id: int) -> List[Dict[str, Any]]:
+        inv = await self.get_inventory(user_id)
+        return [it for it in inv if it["code"].startswith("mashina_") and it["quantity"] > 0]
 
     async def get_items(self, only_active: bool = True) -> List[Dict[str, Any]]:
         async with aiosqlite.connect(self.db_path) as db:

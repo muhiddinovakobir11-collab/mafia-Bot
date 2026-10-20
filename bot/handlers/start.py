@@ -5,7 +5,8 @@ from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKe
 from aiogram.filters import CommandStart, Command
 
 from database.db import db
-from bot.keyboards import get_main_keyboard, get_profile_keyboard, get_shop_menu_keyboard
+from bot.keyboards import get_main_keyboard, get_profile_keyboard, get_shop_menu_keyboard, get_language_keyboard
+from bot.locales import get_text, LANGUAGES
 from game.roles import ROLES
 
 router = Router()
@@ -16,8 +17,14 @@ async def cmd_start(message: Message):
     username = message.from_user.username or ""
     full_name = message.from_user.full_name or ""
 
-    # Check deep join
     args = message.text.split() if message.text else []
+
+    # Check direct profile view deep link
+    if len(args) > 1 and args[1] == "profile":
+        u = await db.get_or_create_user(user_id, username, full_name)
+        full_card = await build_full_profile_card(u)
+        await message.answer(full_card, parse_mode="HTML", reply_markup=get_profile_keyboard())
+        return
     if len(args) > 1 and args[1].startswith("join_"):
         try:
             raw_id = args[1].replace("join_", "")
@@ -182,8 +189,70 @@ async def cmd_start(message: Message):
     )
     await message.answer(welcome_text, parse_mode="HTML", reply_markup=get_main_keyboard(is_admin))
 
+async def build_full_profile_card(user: dict) -> str:
+    user_id = user["id"]
+    inv = await db.get_inventory(user_id)
+    cars = [it for it in inv if it["code"].startswith("mashina_") and it["quantity"] > 0]
+    items = [it for it in inv if not it["code"].startswith("mashina_") and it["quantity"] > 0]
+
+    spouse_str = "Bo'ydoq"
+    marriage = await db.get_marriage(user_id)
+    if marriage and marriage.get("spouse"):
+        spouse_str = f"💍 {marriage['spouse']['full_name']}"
+
+    vip_str = "Yo'q"
+    if user.get("vip_until", 0) > time.time():
+        rem_days = max(1, int((user["vip_until"] - time.time()) / 86400))
+        vip_str = f"👑 Faol ({rem_days} kun qoldi)"
+
+    xp_needed = user["level"] * 150
+    rep = user.get("rep") or 0
+    bank_pul = user.get("bank_pul") or 0
+    custom_title = user.get("custom_title") or "Oddiy fuqaro"
+
+    if cars:
+        car_names = ", ".join([f"{c['name']} ({c['quantity']}x)" for c in cars[:3]])
+        cars_text = f"<b>{len(cars)} ta mashina</b> ({car_names})"
+    else:
+        cars_text = "<i>Yo'q (Garaj bo'sh)</i>"
+
+    if items:
+        item_names = ", ".join([f"{it['icon']} {it['name']} ({it['quantity']})" for it in items[:4]])
+        items_text = f"<b>{len(items)} xil</b> ({item_names})"
+    else:
+        items_text = "<i>Inventar bo'sh</i>"
+
+    winrate = round((user['games_won'] / user['games_played'] * 100), 1) if user['games_played'] > 0 else 0
+
+    return (
+        f"🎩 <b>MAFIA SHAXSIY PROFILI — TO'LIQ HISOBOT</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━━\n"
+        f"👤 <b>Ism:</b> <b>{user['full_name']}</b>\n"
+        f"🆔 <b>ID:</b> <code>{user['id']}</code>\n"
+        f"🎖 <b>Maqom:</b> <b>{custom_title}</b>\n"
+        f"👑 <b>VIP Maqom:</b> <b>{vip_str}</b>\n"
+        f"💍 <b>Oila / Jufti:</b> <b>{spouse_str}</b>\n\n"
+        f"⭐ <b>Daraja:</b> <b>{user['level']}-bosqich</b>\n"
+        f"⚡ <b>Tajriba (XP):</b> <b>{user['xp']:,}</b> / {xp_needed:,} XP\n"
+        f"🌟 <b>Obro' (Rep):</b> <b>{rep}</b> ball\n\n"
+        f"💰 <b>MABLAG'LAR:</b>\n"
+        f"  💵 Cho'ntakda: <b>{user['pul']:,} Pul</b>\n"
+        f"  🏦 Bank hisobida: <b>{bank_pul:,} Pul</b>\n"
+        f"  💎 Olmoslar: <b>{user['almaz']:,} ta</b>\n\n"
+        f"🚗 <b>MAFIA GARAJI:</b>\n"
+        f"  🚘 {cars_text}\n\n"
+        f"🎒 <b>INVENTAR:</b>\n"
+        f"  📦 {items_text}\n\n"
+        f"📊 <b>O'YIN STATISTIKASI:</b>\n"
+        f"  ⚔️ Jami janglar: <b>{user['games_played']} ta</b>\n"
+        f"  🏆 G'alabalar: <b>{user['games_won']} ta</b> (Winrate: <b>{winrate}%</b>)\n"
+        f"━━━━━━━━━━━━━━━━━━━━━\n"
+        f"👇 <i>Pastdagi tugmalar orqali inventaringiz, garajingiz va do'konga o'ting:</i>"
+    )
+
 @router.message(F.text.contains("Profil & Balans"))
-@router.message(Command("profile"))
+@router.message(Command("profile", "balans", "balance", "pulim"))
+@router.message(F.text.lower().in_(["balans", "profil", "pulim", "hisob", "profile", "balance"]))
 async def show_profile(message: Message):
     user = await db.get_or_create_user(
         message.from_user.id,
@@ -194,42 +263,74 @@ async def show_profile(message: Message):
         await message.answer("🚫 <b>Sizning hisobingiz bloklangan!</b>")
         return
 
-    vip_str = "Yo'q"
-    if user.get("vip_until", 0) > time.time():
-        rem_days = max(1, int((user["vip_until"] - time.time()) / 86400))
-        vip_str = f"👑 Faol ({rem_days} kun qoldi)"
-
-    xp_needed = user["level"] * 150
-
-    spouse_str = "Bo'ydoq"
     marriage = await db.get_marriage(user["id"])
-    if marriage and marriage.get("spouse"):
-        spouse_str = f"💍 {marriage['spouse']['full_name']}"
+    spouse_str = f"💍 {marriage['spouse']['full_name']}" if (marriage and marriage.get("spouse")) else "Bo'ydoq"
 
-    bank_pul = user.get("bank_pul") or 0
-    rep = user.get("rep") or 0
+    if message.chat.type in ["group", "supergroup"]:
+        bot_info = await message.bot.get_me()
+        dm_url = f"https://t.me/{bot_info.username}?start=profile"
+        group_kb = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="👤 To'liq profil (Lichkada) ➔", url=dm_url)]
+        ])
+        group_text = (
+            f"👤 <b>O'YINCHI BALANSI VA STATUSI</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━━\n"
+            f"👤 <b>Foydalanuvchi:</b> <b>{user['full_name']}</b>\n"
+            f"💵 <b>Naqd pul:</b> <b>{user['pul']:,} Pul</b>\n"
+            f"💎 <b>Olmoslar:</b> <b>{user['almaz']:,} ta</b>\n"
+            f"💍 <b>Jufti / Parasi:</b> <b>{spouse_str}</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━━\n"
+            f"📩 <i>Mashinalaringiz soni, daraja va to'liq ma'lumotlar shaxsiy lichkangizga yuborildi!</i>"
+        )
+        await message.reply(group_text, parse_mode="HTML", reply_markup=group_kb)
 
-    prof_text = (
-        f"🎩 <b>MAFIA SHAXSIY PROFILI</b>\n"
-        f"━━━━━━━━━━━━━━━━━━━━━\n"
-        f"👤 <b>Ism:</b> <b>{user['full_name']}</b>\n"
-        f"🆔 <b>ID:</b> <code>{user['id']}</code>\n"
-        f"👑 <b>VIP Maqom:</b> <b>{vip_str}</b>\n"
-        f"💍 <b>Oila:</b> <b>{spouse_str}</b>\n\n"
-        f"🎖 <b>Daraja:</b> <b>{user['level']}-bosqich</b>\n"
-        f"⚡ <b>Tajriba (XP):</b> <b>{user['xp']:,}</b> / {xp_needed:,} XP\n"
-        f"⭐ <b>Obro' (Rep):</b> <b>{rep}</b> ball\n\n"
-        f"💰 <b>MABLAG'LAR:</b>\n"
-        f"  💵 Cho'ntakda: <b>{user['pul']:,} Pul</b>\n"
-        f"  🏦 Bank hisobida: <b>{bank_pul:,} Pul</b>\n"
-        f"  💎 Olmoslar: <b>{user['almaz']:,} ta</b>\n\n"
-        f"🎲 <b>O'YIN STATISTIKASI:</b>\n"
-        f"  ⚔️ Jami janglar: <b>{user['games_played']} ta</b>\n"
-        f"  🏆 G'alabalar: <b>{user['games_won']} ta</b>\n"
-        f"━━━━━━━━━━━━━━━━━━━━━\n"
-        f"👇 <i>Pastdagi tugmalar orqali inventaringiz va do'konga o'ting:</i>"
+        # Also send full card to DM!
+        try:
+            full_card = await build_full_profile_card(user)
+            await message.bot.send_message(user["id"], full_card, parse_mode="HTML", reply_markup=get_profile_keyboard())
+        except Exception:
+            pass
+        return
+
+    # In DM (private chat): show full card
+    full_card = await build_full_profile_card(user)
+    await message.answer(full_card, parse_mode="HTML", reply_markup=get_profile_keyboard())
+
+@router.message(Command("lang", "language", "til"))
+@router.message(F.text.contains("Tilni tanlash"))
+@router.callback_query(F.data == "open_lang_select")
+async def choose_language(event: Message | CallbackQuery):
+    text = (
+        "🌐 <b>Iltimos, o'zingizga qulay tilni tanlang:</b>\n"
+        "<i>Пожалуйста, выберите язык / Please select your preferred language:</i>"
     )
-    await message.answer(prof_text, parse_mode="HTML", reply_markup=get_profile_keyboard())
+    kb = get_language_keyboard()
+    if isinstance(event, Message):
+        await event.answer(text, parse_mode="HTML", reply_markup=kb)
+    else:
+        await event.message.answer(text, parse_mode="HTML", reply_markup=kb)
+        await event.answer()
+
+@router.callback_query(F.data.startswith("set_lang_"))
+async def set_lang_callback(call: CallbackQuery):
+    lang_code = call.data.replace("set_lang_", "")
+    await db.set_user_language(call.from_user.id, lang_code)
+    u = await db.get_user(call.from_user.id)
+    is_admin = bool(u.get("is_admin", 0)) if u else False
+
+    msg = get_text("lang_selected", lang_code)
+    await call.message.edit_text(msg, parse_mode="HTML")
+    await call.message.answer(
+        f"✅ {LANGUAGES.get(lang_code, 'O\'zbekcha')}",
+        reply_markup=get_main_keyboard(is_admin, lang=lang_code)
+    )
+    await call.answer()
+
+@router.callback_query(F.data == "my_garage_cb")
+async def show_my_garage_cb(call: CallbackQuery):
+    await call.answer()
+    from bot.handlers.extra_features import show_garage
+    await show_garage(call.message)
 
 @router.callback_query(F.data == "my_inventory")
 async def show_inventory_cb(call: CallbackQuery):
