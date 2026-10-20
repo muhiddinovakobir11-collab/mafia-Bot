@@ -88,6 +88,13 @@ async def duel_help_cb(call: CallbackQuery):
         "<code>/duel 500</code>\n\n"
         "buyrug'ini yuboring. Raqibingiz qabul qilsa, duel boshlanadi va g'olib barcha garovni oladi!"
     )
+    if call.message.chat.type in ["group", "supergroup"]:
+        try:
+            await call.bot.send_message(call.from_user.id, text, parse_mode="HTML")
+            await call.answer("⚔️ Duel qo'llanmasi shaxsiy lichkangizga yuborildi!", show_alert=False)
+        except Exception:
+            await call.answer("⚔️ Guruhda reply qilib /duel 500 deb yozing!", show_alert=True)
+        return
     await call.message.answer(text, parse_mode="HTML")
     await call.answer()
 
@@ -99,6 +106,13 @@ async def marriage_info_cb(call: CallbackQuery):
         "<code>/marry</code>\n\n"
         "buyrug'ini yuboring. Eslatma: Do'kondan <b>💍 Oltin Nikoh Uzugi</b> sotib olgan bo'lishingiz kerak!"
     )
+    if call.message.chat.type in ["group", "supergroup"]:
+        try:
+            await call.bot.send_message(call.from_user.id, text, parse_mode="HTML")
+            await call.answer("💍 Nikoh qo'llanmasi shaxsiy lichkangizga yuborildi!", show_alert=False)
+        except Exception:
+            await call.answer("💍 Do'kondan uzuk olib, reply qilib /marry yozing!", show_alert=True)
+        return
     await call.message.answer(text, parse_mode="HTML")
     await call.answer()
 
@@ -110,6 +124,13 @@ async def promo_code_info_cb(call: CallbackQuery):
         "<code>/promo KOD</code>\n\n"
         "deb yuboring (Masalan: <code>/promo START</code>)."
     )
+    if call.message.chat.type in ["group", "supergroup"]:
+        try:
+            await call.bot.send_message(call.from_user.id, text, parse_mode="HTML")
+            await call.answer("🎟️ Promo-kod qo'llanmasi shaxsiy lichkangizga yuborildi!", show_alert=False)
+        except Exception:
+            await call.answer("🎟️ Botga /promo KOD deb yozing!", show_alert=True)
+        return
     await call.message.answer(text, parse_mode="HTML")
     await call.answer()
 
@@ -359,13 +380,30 @@ async def open_lootbox_menu(message: Message):
         [InlineKeyboardButton(text="📦 Bronza Sandiq (💰 500 Pul)", callback_data="open_box_bronze")],
         [InlineKeyboardButton(text="💎 Oltin Sandiq (💎 5 Almaz)", callback_data="open_box_gold")]
     ])
-    await message.answer(
+    text = (
         "🎁 <b>OMAD SANDIQLARI (LOOTBOX)</b>\n\n"
         "Sandiqlarni ochib tasodifiy qimmatbaho artefaktlar, katta pullar, almazlar yoki VIP status yutib oling!\n\n"
-        "<i>Qaysi sandiqni ochishni xohlaysiz?</i>",
-        reply_markup=kb,
-        parse_mode="HTML"
+        "<i>Qaysi sandiqni ochishni xohlaysiz?</i>"
     )
+    if message.chat.type in ["group", "supergroup"]:
+        bot_info = await message.bot.get_me()
+        bot_url = f"https://t.me/{bot_info.username}?start=box"
+        group_kb = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🤖 Botga o'tish ➔", url=bot_url)]
+        ])
+        await message.reply(
+            "🎁 <b>Omad sandiqlari bot shaxsiy lichkasiga yuborildi!</b>\n"
+            "<i>Sandiqni ochish uchun pastdagi tugmani bosing:</i>",
+            parse_mode="HTML",
+            reply_markup=group_kb
+        )
+        try:
+            await message.bot.send_message(message.from_user.id, text, reply_markup=kb, parse_mode="HTML")
+        except Exception:
+            pass
+        return
+
+    await message.answer(text, reply_markup=kb, parse_mode="HTML")
 
 @router.callback_query(F.data.startswith("open_box_"))
 async def process_open_box(call: CallbackQuery):
@@ -399,14 +437,22 @@ async def process_open_box(call: CallbackQuery):
         elif chosen[0] == "item":
             await db.add_inventory_item(user_id, chosen[1], 1)
 
-        await call.answer("🎉 Sandiq ochildi!", show_alert=True)
-        await call.message.edit_text(
+        result_txt = (
             f"📦 <b>BRONZA SANDIQ OCHILDI!</b>\n\n"
             f"Sizga tushgan sovg'a:\n"
             f"🎁 <b>{chosen[2]}</b>!\n\n"
-            f"<i>Inventar va balansingiz to'ldirildi.</i>",
-            parse_mode="HTML"
+            f"<i>Inventar va balansingiz to'ldirildi.</i>"
         )
+        if call.message.chat.type in ["group", "supergroup"]:
+            try:
+                await call.bot.send_message(user_id, result_txt, parse_mode="HTML")
+                await call.answer("🎉 Sandiq ochildi! Sovg'a shaxsiy lichkangizga yuborildi.", show_alert=False)
+            except Exception:
+                await call.answer("🎉 Sandiq ochildi!", show_alert=True)
+            return
+
+        await call.answer("🎉 Sandiq ochildi!", show_alert=True)
+        await call.message.edit_text(result_txt, parse_mode="HTML")
 
     elif box_type == "gold":
         price = 5
@@ -440,14 +486,22 @@ async def process_open_box(call: CallbackQuery):
             else:
                 await db.add_inventory_item(user_id, chosen[1], 1)
 
-        await call.answer("🎉 Oltin sandiq ochildi!", show_alert=True)
-        await call.message.edit_text(
+        result_txt = (
             f"💎 <b>OLTIN SANDIQ OCHILDI!</b>\n\n"
             f"Sizga tushgan sovg'a:\n"
             f"🎁 <b>{chosen[2]}</b>!\n\n"
-            f"<i>Tabriklaymiz!</i>",
-            parse_mode="HTML"
+            f"<i>Tabriklaymiz!</i>"
         )
+        if call.message.chat.type in ["group", "supergroup"]:
+            try:
+                await call.bot.send_message(user_id, result_txt, parse_mode="HTML")
+                await call.answer("🎉 Oltin sandiq ochildi! Sovg'a shaxsiy lichkangizga yuborildi.", show_alert=False)
+            except Exception:
+                await call.answer("🎉 Oltin sandiq ochildi!", show_alert=True)
+            return
+
+        await call.answer("🎉 Oltin sandiq ochildi!", show_alert=True)
+        await call.message.edit_text(result_txt, parse_mode="HTML")
 
 # ==============================================================================
 # 8. ANONIM XABAR / MAXFIY E'TIROF (/anon <matn>)

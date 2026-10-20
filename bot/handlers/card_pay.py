@@ -30,7 +30,26 @@ async def show_card_pay_menu(message: Message):
         "<i>Kerakli paketni tanlang:</i>"
     )
     kb = get_card_packages_keyboard(packages, pkg_type="almaz")
-    await message.answer(text, reply_mode="HTML", parse_mode="HTML", reply_markup=kb)
+
+    if message.chat.type in ["group", "supergroup"]:
+        bot_info = await message.bot.get_me()
+        bot_url = f"https://t.me/{bot_info.username}?start=card"
+        group_kb = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🤖 Botga o'tish ➔", url=bot_url)]
+        ])
+        await message.reply(
+            "💳 <b>Karta orqali xarid qilish menyusi shaxsiy lichkangizga yuborildi!</b>\n"
+            "<i>Xarid qilish uchun pastdagi tugmani bosing:</i>",
+            parse_mode="HTML",
+            reply_markup=group_kb
+        )
+        try:
+            await message.bot.send_message(message.from_user.id, text, parse_mode="HTML", reply_markup=kb)
+        except Exception:
+            pass
+        return
+
+    await message.answer(text, parse_mode="HTML", reply_markup=kb)
 
 @router.callback_query(F.data == "buy_card_menu")
 async def show_card_pay_cb(call: CallbackQuery):
@@ -42,6 +61,16 @@ async def show_card_pay_cb(call: CallbackQuery):
         "<i>Kerakli paketni tanlang:</i>"
     )
     kb = get_card_packages_keyboard(packages, pkg_type="almaz")
+
+    if call.message.chat.type in ["group", "supergroup"]:
+        try:
+            await call.bot.send_message(call.from_user.id, text, parse_mode="HTML", reply_markup=kb)
+            await call.answer("💳 Karta paketlari shaxsiy lichkangizga yuborildi!", show_alert=False)
+        except Exception:
+            bot_info = await call.bot.get_me()
+            await call.answer(f"⚠️ Avval @{bot_info.username} ga kirib Start bosing!", show_alert=True)
+        return
+
     await call.message.edit_text(text, parse_mode="HTML", reply_markup=kb)
     await call.answer()
 
@@ -57,7 +86,18 @@ async def switch_card_view(call: CallbackQuery):
         "vip": "👑 <b>VIP Status paketlari:</b>"
     }
     title = type_titles.get(pkg_type, "Xarid paketlari:")
-    await call.message.edit_text(f"💳 <b>KARTA ORQALI XARID</b>\n\n{title}", parse_mode="HTML", reply_markup=kb)
+    text = f"💳 <b>KARTA ORQALI XARID</b>\n\n{title}"
+
+    if call.message.chat.type in ["group", "supergroup"]:
+        try:
+            await call.bot.send_message(call.from_user.id, text, parse_mode="HTML", reply_markup=kb)
+            await call.answer("💳 Paketlar lichkangizga yuborildi!", show_alert=False)
+        except Exception:
+            bot_info = await call.bot.get_me()
+            await call.answer(f"⚠️ Avval @{bot_info.username} ga kirib Start bosing!", show_alert=True)
+        return
+
+    await call.message.edit_text(text, parse_mode="HTML", reply_markup=kb)
     await call.answer()
 
 @router.callback_query(F.data.startswith("buy_card_pkg_"))
@@ -126,6 +166,16 @@ async def process_card_package_select(call: CallbackQuery):
     )
 
     kb = get_card_invoice_keyboard(tx_id)
+
+    if call.message.chat.type in ["group", "supergroup"]:
+        try:
+            await call.bot.send_message(call.from_user.id, invoice_text, parse_mode="HTML", reply_markup=kb)
+            await call.answer("🧾 To'lov hisob-fakturasi shaxsiy lichkangizga yuborildi!", show_alert=False)
+        except Exception:
+            bot_info = await call.bot.get_me()
+            await call.answer(f"⚠️ Avval @{bot_info.username} ga kirib Start bosing!", show_alert=True)
+        return
+
     await call.message.edit_text(invoice_text, parse_mode="HTML", reply_markup=kb)
     await call.answer()
 
@@ -139,13 +189,21 @@ async def check_card_tx_status(call: CallbackQuery):
         return
 
     if tx["status"] == "completed":
-        await call.answer("✅ To'lovingiz allaqachon tasdiqlangan va balansga o'tgan!", show_alert=True)
-        await call.message.edit_text(
+        comp_text = (
             f"🎉 <b>TO'LOV MUVAFFAQIYATLI YAKUNLANGAN!</b>\n\n"
             f"Hisob-faktura: <code>#{tx_id}</code>\n"
-            f"Balansingizga xarid qilingan mahsulot to'liq qo'shilgan. Rahmat!",
-            parse_mode="HTML"
+            f"Balansingizga xarid qilingan mahsulot to'liq qo'shilgan. Rahmat!"
         )
+        if call.message.chat.type in ["group", "supergroup"]:
+            try:
+                await call.bot.send_message(call.from_user.id, comp_text, parse_mode="HTML")
+            except Exception:
+                pass
+            await call.answer("✅ To'lovingiz allaqachon tasdiqlangan va balansga o'tgan!", show_alert=True)
+            return
+
+        await call.answer("✅ To'lovingiz allaqachon tasdiqlangan va balansga o'tgan!", show_alert=True)
+        await call.message.edit_text(comp_text, parse_mode="HTML")
         return
 
     if tx["status"] == "cancelled":
@@ -157,14 +215,22 @@ async def check_card_tx_status(call: CallbackQuery):
     if sof_tx and sof_tx.get("status") == "completed":
         comp = await db.complete_card_transaction(tx_id)
         if comp:
-            await call.answer("✅ To'lovingiz SofPay orqali tasdiqlandi!", show_alert=True)
-            await call.message.edit_text(
+            done_text = (
                 f"🎉 <b>TO'LOV MUVAFFAQIYATLI YAKUNLANDI!</b>\n\n"
                 f"🆔 Hisob-faktura: <code>#{tx_id}</code>\n"
                 f"📦 Xaridingiz: <b>+{comp['item_amount']:,} {comp['item_type'].upper()}</b> balansga qo'shildi!\n\n"
-                f"Rahmat, o'yinda omad tilaymiz! 🎲",
-                parse_mode="HTML"
+                f"Rahmat, o'yinda omad tilaymiz! 🎲"
             )
+            if call.message.chat.type in ["group", "supergroup"]:
+                try:
+                    await call.bot.send_message(call.from_user.id, done_text, parse_mode="HTML")
+                except Exception:
+                    pass
+                await call.answer("✅ To'lovingiz SofPay orqali tasdiqlandi!", show_alert=True)
+            else:
+                await call.answer("✅ To'lovingiz SofPay orqali tasdiqlandi!", show_alert=True)
+                await call.message.edit_text(done_text, parse_mode="HTML")
+
             for aid in ADMIN_IDS:
                 try:
                     await call.bot.send_message(
@@ -196,6 +262,12 @@ async def cancel_card_tx_callback(call: CallbackQuery):
     await sofpay_client.cancel_transaction(tx_id)
     await db.cancel_card_transaction(tx_id)
     await call.answer("❌ To'lov bekor qilindi.", show_alert=True)
+    if call.message.chat.type in ["group", "supergroup"]:
+        try:
+            await call.bot.send_message(call.from_user.id, f"❌ <b>#{tx_id} raqamli to'lov bekor qilindi.</b>", parse_mode="HTML")
+        except Exception:
+            pass
+        return
     await call.message.edit_text(f"❌ <b>#{tx_id} raqamli to'lov bekor qilindi.</b>", parse_mode="HTML")
 
 # Photo / Receipt upload handler

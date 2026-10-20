@@ -8,51 +8,61 @@ from bot.keyboards import get_shop_menu_keyboard
 
 router = Router()
 
+SHOP_WELCOME_TEXT = (
+    "🛍️ <b>MAFIYA SEHRLI DO'KONI</b>\n\n"
+    "Bu yerda o'yinda sizga ustunlik beruvchi kuchli artefaktlar, himoya vositalari va VIP statusni "
+    "💰 <b>Pul</b> yoki 💎 <b>Almaz</b> evaziga sotib olishingiz mumkin!\n\n"
+    "<i>Qaysi bo'limga o'tmoqchisiz?</i>"
+)
+
 @router.message(F.text.contains("Do'kon & Narsalar"))
 @router.message(Command("shop", "store", "market", "dokon", "do'kon"))
 @router.message(F.text.lower().in_(["dokon", "do'kon", "shop", "store", "market"]))
 @router.callback_query(F.data == "open_shop")
 async def show_shop_menu(event: Message | CallbackQuery):
-    if isinstance(event, Message) and event.chat.type in ["group", "supergroup"]:
-        bot_info = await event.bot.get_me()
-        bot_url = f"https://t.me/{bot_info.username}?start=shop"
-        group_kb = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="🤖 Botga o'tish ➔", url=bot_url)]
-        ])
-        await event.reply(
-            "🛍️ <b>Do'kon shaxsiy lichkangizga yuborildi!</b>\n"
-            "<i>Do'konni ochish uchun pastdagi tugmani bosing:</i>",
-            parse_mode="HTML",
-            reply_markup=group_kb
-        )
-        try:
-            shop_text = (
-                "🛍️ <b>MAFIYA SEHRLI DO'KONI</b>\n\n"
-                "Bu yerda o'yinda sizga ustunlik beruvchi kuchli artefaktlar, himoya vositalari va VIP statusni "
-                "💰 <b>Pul</b> yoki 💎 <b>Almaz</b> evaziga sotib olishingiz mumkin!\n\n"
-                "<i>Qaysi bo'limga o'tmoqchisiz?</i>"
+    is_cb = isinstance(event, CallbackQuery)
+    user_id = event.from_user.id
+    chat_type = event.message.chat.type if is_cb else event.chat.type
+    bot = event.bot
+
+    if chat_type in ["group", "supergroup"]:
+        if not is_cb:
+            bot_info = await bot.get_me()
+            bot_url = f"https://t.me/{bot_info.username}?start=shop"
+            group_kb = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="🤖 Botga o'tish ➔", url=bot_url)]
+            ])
+            await event.reply(
+                "🛍️ <b>Do'kon shaxsiy lichkangizga yuborildi!</b>\n"
+                "<i>Do'konni ochish uchun pastdagi tugmani bosing:</i>",
+                parse_mode="HTML",
+                reply_markup=group_kb
             )
-            await event.bot.send_message(
-                event.from_user.id,
-                shop_text,
+
+        try:
+            await bot.send_message(
+                user_id,
+                SHOP_WELCOME_TEXT,
                 parse_mode="HTML",
                 reply_markup=get_shop_menu_keyboard()
             )
+            if is_cb:
+                await event.answer("🛍️ Do'kon shaxsiy lichkangizga yuborildi!", show_alert=False)
         except Exception:
-            pass
+            if is_cb:
+                bot_info = await bot.get_me()
+                await event.answer(f"⚠️ Avval @{bot_info.username} ga kirib Start bosing!", show_alert=True)
         return
 
-    text = (
-        "🛍️ <b>MAFIYA SEHRLI DO'KONI</b>\n\n"
-        "Bu yerda o'yinda sizga ustunlik beruvchi kuchli artefaktlar, himoya vositalari va VIP statusni "
-        "💰 <b>Pul</b> yoki 💎 <b>Almaz</b> evaziga sotib olishingiz mumkin!\n\n"
-        "<i>Qaysi bo'limga o'tmoqchisiz?</i>"
-    )
-    if isinstance(event, Message):
-        await event.answer(text, parse_mode="HTML", reply_markup=get_shop_menu_keyboard())
-    else:
-        await event.message.answer(text, parse_mode="HTML", reply_markup=get_shop_menu_keyboard())
+    # In DM:
+    if is_cb:
+        try:
+            await event.message.edit_text(SHOP_WELCOME_TEXT, parse_mode="HTML", reply_markup=get_shop_menu_keyboard())
+        except Exception:
+            await event.message.answer(SHOP_WELCOME_TEXT, parse_mode="HTML", reply_markup=get_shop_menu_keyboard())
         await event.answer()
+    else:
+        await event.answer(SHOP_WELCOME_TEXT, parse_mode="HTML", reply_markup=get_shop_menu_keyboard())
 
 @router.callback_query(F.data == "shop_view_pul")
 async def view_shop_pul(call: CallbackQuery):
@@ -66,12 +76,24 @@ async def view_shop_pul(call: CallbackQuery):
 
     buttons.append([InlineKeyboardButton(text="🔙 Orqaga", callback_data="open_shop")])
     kb = InlineKeyboardMarkup(inline_keyboard=buttons)
-
-    await call.message.answer(
+    text = (
         "💰 <b>PULGA SOTIB OLINADIGAN BUYUMLAR:</b>\n\n"
-        "O'zingizga kerakli narsani tanlang va xarid qiling:",
-        reply_markup=kb
+        "O'zingizga kerakli narsani tanlang va xarid qiling:"
     )
+
+    if call.message.chat.type in ["group", "supergroup"]:
+        try:
+            await call.bot.send_message(call.from_user.id, text, parse_mode="HTML", reply_markup=kb)
+            await call.answer("💰 Buyumlar ro'yxati shaxsiy lichkangizga yuborildi!", show_alert=False)
+        except Exception:
+            bot_info = await call.bot.get_me()
+            await call.answer(f"⚠️ Avval @{bot_info.username} ga kirib Start bosing!", show_alert=True)
+        return
+
+    try:
+        await call.message.edit_text(text, parse_mode="HTML", reply_markup=kb)
+    except Exception:
+        await call.message.answer(text, parse_mode="HTML", reply_markup=kb)
     await call.answer()
 
 @router.callback_query(F.data == "shop_view_almaz")
@@ -86,12 +108,24 @@ async def view_shop_almaz(call: CallbackQuery):
 
     buttons.append([InlineKeyboardButton(text="🔙 Orqaga", callback_data="open_shop")])
     kb = InlineKeyboardMarkup(inline_keyboard=buttons)
-
-    await call.message.answer(
+    text = (
         "💎 <b>ALMAZGA SOTIB OLINADIGAN BUYUMLAR VA VIP:</b>\n\n"
-        "O'zingizga kerakli narsani tanlang va xarid qiling:",
-        reply_markup=kb
+        "O'zingizga kerakli narsani tanlang va xarid qiling:"
     )
+
+    if call.message.chat.type in ["group", "supergroup"]:
+        try:
+            await call.bot.send_message(call.from_user.id, text, parse_mode="HTML", reply_markup=kb)
+            await call.answer("💎 Buyumlar ro'yxati shaxsiy lichkangizga yuborildi!", show_alert=False)
+        except Exception:
+            bot_info = await call.bot.get_me()
+            await call.answer(f"⚠️ Avval @{bot_info.username} ga kirib Start bosing!", show_alert=True)
+        return
+
+    try:
+        await call.message.edit_text(text, parse_mode="HTML", reply_markup=kb)
+    except Exception:
+        await call.message.answer(text, parse_mode="HTML", reply_markup=kb)
     await call.answer()
 
 @router.callback_query(F.data.startswith("buy_item_pul_"))
@@ -113,13 +147,23 @@ async def handle_buy_item_pul(call: CallbackQuery):
     await db.update_balance(user["id"], pul_diff=-price)
     await db.add_inventory_item(user["id"], item_code, 1)
 
-    await call.answer(f"✅ {item['name']} muvaffaqiyatli sotib olindi!", show_alert=True)
-    await call.message.answer(
+    receipt_text = (
         f"🎉 <b>Xarid muvaffaqiyatli amalga oshirildi!</b>\n\n"
         f"Siz <b>{item['icon']} {item['name']}</b> sotib oldingiz.\n"
         f"💰 Sarflandi: <b>{price:,} Pul</b>\n"
         f"🎒 Bu narsa o'yin paytida avtomatik foyda beradi!"
     )
+
+    if call.message.chat.type in ["group", "supergroup"]:
+        try:
+            await call.bot.send_message(user["id"], receipt_text, parse_mode="HTML")
+            await call.answer(f"✅ {item['name']} sotib olindi! Chek lichkaga yuborildi.", show_alert=False)
+        except Exception:
+            await call.answer(f"✅ {item['name']} sotib olindi!", show_alert=True)
+        return
+
+    await call.answer(f"✅ {item['name']} muvaffaqiyatli sotib olindi!", show_alert=True)
+    await call.message.answer(receipt_text, parse_mode="HTML")
 
 @router.callback_query(F.data.startswith("buy_item_almaz_"))
 async def handle_buy_item_almaz(call: CallbackQuery):
@@ -155,12 +199,22 @@ async def handle_buy_item_almaz(call: CallbackQuery):
     else:
         await db.add_inventory_item(user["id"], item_code, 1)
 
-    await call.answer(f"✅ {item['name']} muvaffaqiyatli xarid qilindi!", show_alert=True)
-    await call.message.answer(
+    receipt_text = (
         f"🎉 <b>Xarid muvaffaqiyatli!</b>\n\n"
         f"Siz <b>{item['icon']} {item['name']}</b> xarid qildingiz.\n"
         f"💎 Sarflandi: <b>{price} Almaz</b>"
     )
+
+    if call.message.chat.type in ["group", "supergroup"]:
+        try:
+            await call.bot.send_message(user["id"], receipt_text, parse_mode="HTML")
+            await call.answer(f"✅ {item['name']} xarid qilindi! Chek lichkaga yuborildi.", show_alert=False)
+        except Exception:
+            await call.answer(f"✅ {item['name']} xarid qilindi!", show_alert=True)
+        return
+
+    await call.answer(f"✅ {item['name']} muvaffaqiyatli xarid qilindi!", show_alert=True)
+    await call.message.answer(receipt_text, parse_mode="HTML")
 
 @router.callback_query(F.data == "shop_exchange")
 async def show_exchange_menu(call: CallbackQuery):
@@ -173,12 +227,25 @@ async def show_exchange_menu(call: CallbackQuery):
         [InlineKeyboardButton(text=f"💎 10 Almaz ➔ 💰 {rate * 10:,} Pul", callback_data="exchange_10")],
         [InlineKeyboardButton(text="🔙 Orqaga", callback_data="open_shop")]
     ])
-    await call.message.answer(
+    exchange_text = (
         f"🔄 <b>ALMAZNI PULGA ALMASHTIRISH VALYUTA BIRJASI</b>\n\n"
         f"Joriy kurs: <b>1 💎 Almaz = {rate:,} 💰 Pul</b>\n\n"
-        f"Qancha almashtirmoqchisiz?",
-        reply_markup=kb
+        f"Qancha almashtirmoqchisiz?"
     )
+
+    if call.message.chat.type in ["group", "supergroup"]:
+        try:
+            await call.bot.send_message(call.from_user.id, exchange_text, parse_mode="HTML", reply_markup=kb)
+            await call.answer("🔄 Valyuta birjasi lichkangizga yuborildi!", show_alert=False)
+        except Exception:
+            bot_info = await call.bot.get_me()
+            await call.answer(f"⚠️ Avval @{bot_info.username} ga kirib Start bosing!", show_alert=True)
+        return
+
+    try:
+        await call.message.edit_text(exchange_text, parse_mode="HTML", reply_markup=kb)
+    except Exception:
+        await call.message.answer(exchange_text, parse_mode="HTML", reply_markup=kb)
     await call.answer()
 
 @router.callback_query(F.data.startswith("exchange_"))
@@ -198,9 +265,19 @@ async def process_exchange(call: CallbackQuery):
         return
 
     await db.update_balance(user["id"], pul_diff=pul_to_receive, almaz_diff=-almaz_to_spend)
-    await call.answer(f"✅ +{pul_to_receive:,} pulga almashtirildi!", show_alert=True)
-    await call.message.answer(
+    success_text = (
         f"✅ <b>Almashuv bajarildi!</b>\n"
         f"💎 -{almaz_to_spend} Almaz\n"
         f"💰 +{pul_to_receive:,} Pul hisobingizga qo'shildi!"
     )
+
+    if call.message.chat.type in ["group", "supergroup"]:
+        try:
+            await call.bot.send_message(user["id"], success_text, parse_mode="HTML")
+            await call.answer(f"✅ +{pul_to_receive:,} pulga almashtirildi! Chek lichkaga yuborildi.", show_alert=False)
+        except Exception:
+            await call.answer(f"✅ +{pul_to_receive:,} pulga almashtirildi!", show_alert=True)
+        return
+
+    await call.answer(f"✅ +{pul_to_receive:,} pulga almashtirildi!", show_alert=True)
+    await call.message.answer(success_text, parse_mode="HTML")

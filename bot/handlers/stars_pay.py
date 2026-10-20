@@ -19,31 +19,10 @@ router = Router()
 @router.callback_query(F.data == "buy_stars_menu")
 @router.callback_query(F.data == "stars_type_almaz")
 async def show_stars_almaz_menu(event: Message | CallbackQuery):
-    if isinstance(event, Message) and event.chat.type in ["group", "supergroup"]:
-        bot_info = await event.bot.get_me()
-        bot_url = f"https://t.me/{bot_info.username}?start=stars"
-        group_kb = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="🤖 Botga o'tish ➔", url=bot_url)]
-        ])
-        await event.reply(
-            "⭐️ <b>Stars va to'lovlar menyusi shaxsiy lichkangizga yuborildi!</b>\n"
-            "<i>Paketlarni ko'rish uchun pastdagi tugmani bosing:</i>",
-            parse_mode="HTML",
-            reply_markup=group_kb
-        )
-        try:
-            packages = await db.get_star_packages(pkg_type="almaz", only_active=True)
-            text = (
-                "⭐️ <b>TELEGRAM STARS ORQALI ALMAZ VA PUL XARID QILISH</b> ⭐️\n\n"
-                "Almazlar — botdagi premium valyuta bo'lib, ular orqali eng kuchli artefaktlar, "
-                "VIP status va noyob unvonlarni sotib olishingiz mumkin!\n\n"
-                "<i>Quyidagi paketlardan birini tanlang:</i>"
-            )
-            kb = get_star_packages_keyboard(packages, pkg_type="almaz")
-            await event.bot.send_message(event.from_user.id, text, parse_mode="HTML", reply_markup=kb)
-        except Exception:
-            pass
-        return
+    is_cb = isinstance(event, CallbackQuery)
+    user_id = event.from_user.id
+    chat_type = event.message.chat.type if is_cb else event.chat.type
+    bot = event.bot
 
     packages = await db.get_star_packages(pkg_type="almaz", only_active=True)
     text = (
@@ -53,11 +32,39 @@ async def show_stars_almaz_menu(event: Message | CallbackQuery):
         "<i>Quyidagi paketlardan birini tanlang:</i>"
     )
     kb = get_star_packages_keyboard(packages, pkg_type="almaz")
-    if isinstance(event, Message):
-        await event.answer(text, parse_mode="HTML", reply_markup=kb)
-    else:
-        await event.message.answer(text, parse_mode="HTML", reply_markup=kb)
+
+    if chat_type in ["group", "supergroup"]:
+        if not is_cb:
+            bot_info = await bot.get_me()
+            bot_url = f"https://t.me/{bot_info.username}?start=stars"
+            group_kb = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="🤖 Botga o'tish ➔", url=bot_url)]
+            ])
+            await event.reply(
+                "⭐️ <b>Stars va to'lovlar menyusi shaxsiy lichkangizga yuborildi!</b>\n"
+                "<i>Paketlarni ko'rish uchun pastdagi tugmani bosing:</i>",
+                parse_mode="HTML",
+                reply_markup=group_kb
+            )
+        try:
+            await bot.send_message(user_id, text, parse_mode="HTML", reply_markup=kb)
+            if is_cb:
+                await event.answer("⭐️ Stars paketlari shaxsiy lichkangizga yuborildi!", show_alert=False)
+        except Exception:
+            if is_cb:
+                bot_info = await bot.get_me()
+                await event.answer(f"⚠️ Avval @{bot_info.username} ga kirib Start bosing!", show_alert=True)
+        return
+
+    # In DM:
+    if is_cb:
+        try:
+            await event.message.edit_text(text, parse_mode="HTML", reply_markup=kb)
+        except Exception:
+            await event.message.answer(text, parse_mode="HTML", reply_markup=kb)
         await event.answer()
+    else:
+        await event.answer(text, parse_mode="HTML", reply_markup=kb)
 
 @router.callback_query(F.data == "stars_type_pul")
 async def show_stars_pul_menu(call: CallbackQuery):
@@ -68,7 +75,20 @@ async def show_stars_pul_menu(call: CallbackQuery):
         "<i>O'zingizga ma'qul paketni tanlang:</i>"
     )
     kb = get_star_packages_keyboard(packages, pkg_type="pul")
-    await call.message.answer(text, parse_mode="HTML", reply_markup=kb)
+
+    if call.message.chat.type in ["group", "supergroup"]:
+        try:
+            await call.bot.send_message(call.from_user.id, text, parse_mode="HTML", reply_markup=kb)
+            await call.answer("⭐️ Stars pul paketlari shaxsiy lichkangizga yuborildi!", show_alert=False)
+        except Exception:
+            bot_info = await call.bot.get_me()
+            await call.answer(f"⚠️ Avval @{bot_info.username} ga kirib Start bosing!", show_alert=True)
+        return
+
+    try:
+        await call.message.edit_text(text, parse_mode="HTML", reply_markup=kb)
+    except Exception:
+        await call.message.answer(text, parse_mode="HTML", reply_markup=kb)
     await call.answer()
 
 @router.callback_query(F.data.startswith("buy_pkg_"))
@@ -98,7 +118,10 @@ async def create_stars_invoice(call: CallbackQuery):
             prices=prices,
             provider_token="" # Must be empty for Telegram Stars!
         )
-        await call.answer("⭐️ To'lov cheki yuborildi!")
+        if call.message.chat.type in ["group", "supergroup"]:
+            await call.answer("⭐️ To'lov hisob-fakturasi shaxsiy lichkangizga yuborildi!", show_alert=False)
+        else:
+            await call.answer("⭐️ To'lov cheki yuborildi!")
     except Exception as e:
         print(f"[Stars Invoice Error]: {e}")
         await call.answer("❌ To'lov chekini yaratishda xatolik yuz berdi!", show_alert=True)

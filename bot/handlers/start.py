@@ -198,6 +198,25 @@ async def cmd_start(message: Message):
             from bot.handlers.stars_pay import show_stars_almaz_menu
             await show_stars_almaz_menu(message)
             return
+        elif param == "card":
+            from bot.handlers.card_pay import show_card_pay_menu
+            await show_card_pay_menu(message)
+            return
+        elif param == "lang":
+            await choose_language(message)
+            return
+        elif param == "box":
+            from bot.handlers.extra_features import open_lootbox_menu
+            await open_lootbox_menu(message)
+            return
+        elif param == "quests":
+            from bot.handlers.quests_achievements import show_daily_quests
+            await show_daily_quests(message)
+            return
+        elif param == "achievements":
+            from bot.handlers.quests_achievements import show_achievements
+            await show_achievements(message)
+            return
 
     # If new user and has referrer, reward referrer
     if referred_by and user.get("created_at") and user.get("referred_by") == referred_by:
@@ -380,11 +399,36 @@ async def choose_language(event: Message | CallbackQuery):
         "<i>Пожалуйста, выберите язык / Please select your preferred language:</i>"
     )
     kb = get_language_keyboard()
-    if isinstance(event, Message):
-        await event.answer(text, parse_mode="HTML", reply_markup=kb)
-    else:
-        await event.message.answer(text, parse_mode="HTML", reply_markup=kb)
+    is_cb = isinstance(event, CallbackQuery)
+    chat_type = event.message.chat.type if is_cb else event.chat.type
+    bot = event.bot
+
+    if chat_type in ["group", "supergroup"]:
+        if not is_cb:
+            bot_info = await bot.get_me()
+            bot_url = f"https://t.me/{bot_info.username}?start=lang"
+            group_kb = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="🤖 Botga o'tish ➔", url=bot_url)]
+            ])
+            await event.reply("🌐 <b>Tilni tanlash menyusi bot lichkasiga yuborildi!</b>", parse_mode="HTML", reply_markup=group_kb)
+        try:
+            await bot.send_message(event.from_user.id, text, parse_mode="HTML", reply_markup=kb)
+            if is_cb:
+                await event.answer("🌐 Til tanlash menyusi shaxsiy lichkangizga yuborildi!", show_alert=False)
+        except Exception:
+            if is_cb:
+                bot_info = await bot.get_me()
+                await event.answer(f"⚠️ Avval @{bot_info.username} ga kirib Start bosing!", show_alert=True)
+        return
+
+    if is_cb:
+        try:
+            await event.message.edit_text(text, parse_mode="HTML", reply_markup=kb)
+        except Exception:
+            await event.message.answer(text, parse_mode="HTML", reply_markup=kb)
         await event.answer()
+    else:
+        await event.answer(text, parse_mode="HTML", reply_markup=kb)
 
 @router.callback_query(F.data.startswith("set_lang_"))
 async def set_lang_callback(call: CallbackQuery):
@@ -394,6 +438,19 @@ async def set_lang_callback(call: CallbackQuery):
     is_admin = bool(u.get("is_admin", 0)) if u else False
 
     msg = get_text("lang_selected", lang_code)
+    if call.message.chat.type in ["group", "supergroup"]:
+        try:
+            await call.bot.send_message(
+                call.from_user.id,
+                f"{msg}\n✅ {LANGUAGES.get(lang_code, 'O\'zbekcha')}",
+                reply_markup=get_main_keyboard(is_admin, lang=lang_code),
+                parse_mode="HTML"
+            )
+            await call.answer("✅ Til o'zgartirildi!", show_alert=False)
+        except Exception:
+            await call.answer("✅ Til o'zgartirildi!", show_alert=False)
+        return
+
     await call.message.edit_text(msg, parse_mode="HTML")
     await call.message.answer(
         f"✅ {LANGUAGES.get(lang_code, 'O\'zbekcha')}",
@@ -403,23 +460,63 @@ async def set_lang_callback(call: CallbackQuery):
 
 @router.callback_query(F.data == "my_garage_cb")
 async def show_my_garage_cb(call: CallbackQuery):
+    user_id = call.from_user.id
+    inv = await db.get_inventory(user_id)
+    inv_map = {it["code"]: it["quantity"] for it in inv}
+    from bot.handlers.extra_features import CAR_DEFINITIONS
+    cars_txt = []
+    for code, title, stat in CAR_DEFINITIONS:
+        cnt = inv_map.get(code, 0)
+        if cnt > 0:
+            cars_txt.append(f"• <b>{title}</b> ({cnt} ta) — <i>{stat}</i>")
+
+    if not cars_txt:
+        garage_text = (
+            "🚗 <b>SIZNING GARAJIYINGIZ BO'SH!</b>\n\n"
+            "Sizda hali mashina yo'q. Mashinalar kechasi mafiya yoki qotil hujumidan **qochib qolish** imkonini beradi!\n\n"
+            "<i>Mashinalarni 🛍️ Do'kondan xarid qilishingiz yoki do'stlaringizdan sovg'a olishingiz mumkin.</i>"
+        )
+    else:
+        garage_text = (
+            f"🚗 <b>SIZNING MAFIYA GARAJIYINGIZ:</b>\n\n" +
+            "\n".join(cars_txt) +
+            "\n\n✨ <i>Ushbu avtomobillar o'yinda passiv himoya sifatida avtomatik ishlaydi!</i>\n"
+            "🎁 <i>Do'stingizga mashina sovg'a qilish uchun uning xabariga reply qilib <code>/givecar</code> deb yozing!</i>"
+        )
+
+    if call.message.chat.type in ["group", "supergroup"]:
+        try:
+            await call.bot.send_message(user_id, garage_text, parse_mode="HTML")
+            await call.answer("🚗 Garajingiz shaxsiy lichkangizga yuborildi!", show_alert=False)
+        except Exception:
+            bot_info = await call.bot.get_me()
+            await call.answer(f"⚠️ Avval @{bot_info.username} ga kirib Start bosing!", show_alert=True)
+        return
+
+    await call.message.answer(garage_text, parse_mode="HTML")
     await call.answer()
-    from bot.handlers.extra_features import show_garage
-    await show_garage(call.message)
 
 @router.callback_query(F.data == "my_inventory")
 async def show_inventory_cb(call: CallbackQuery):
     user_id = call.from_user.id
     inv = await db.get_inventory(user_id)
     if not inv:
-        await call.message.answer("🎒 <b>Sizning inventaringiz bo'sh!</b>\nDo'kondan buyumlar sotib oling.")
-        await call.answer()
+        txt = "🎒 <b>Sizning inventaringiz bo'sh!</b>\nDo'kondan buyumlar sotib oling."
+    else:
+        txt = "🎒 <b>SIZNING INVENTARINGIZ:</b>\n\n"
+        for it in inv:
+            txt += f"{it['icon']} <b>{it['name']}</b>: {it['quantity']} ta\n   <i>{it['description']}</i>\n\n"
+        txt += "<i>Buyumlar o'yin boshlanganda yoki o'yin davomida avtomatik ishlatiladi.</i>"
+
+    if call.message.chat.type in ["group", "supergroup"]:
+        try:
+            await call.bot.send_message(user_id, txt, parse_mode="HTML")
+            await call.answer("🎒 Inventaringiz shaxsiy lichkangizga yuborildi!", show_alert=False)
+        except Exception:
+            bot_info = await call.bot.get_me()
+            await call.answer(f"⚠️ Avval @{bot_info.username} ga kirib Start bosing!", show_alert=True)
         return
 
-    txt = "🎒 <b>SIZNING INVENTARINGIZ:</b>\n\n"
-    for it in inv:
-        txt += f"{it['icon']} <b>{it['name']}</b>: {it['quantity']} ta\n   <i>{it['description']}</i>\n\n"
-    txt += "<i>Buyumlar o'yin boshlanganda yoki o'yin davomida avtomatik ishlatiladi.</i>"
     await call.message.answer(txt, parse_mode="HTML")
     await call.answer()
 

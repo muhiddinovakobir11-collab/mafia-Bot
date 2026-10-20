@@ -41,6 +41,25 @@ async def show_daily_quests(message: Message):
             buttons.append([InlineKeyboardButton(text=f"🎁 {q['title']} sovg'asini olish!", callback_data=f"claim_q_{q['code']}")])
 
     kb = InlineKeyboardMarkup(inline_keyboard=buttons) if buttons else None
+
+    if message.chat.type in ["group", "supergroup"]:
+        bot_info = await message.bot.get_me()
+        bot_url = f"https://t.me/{bot_info.username}?start=quests"
+        group_kb = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🤖 Botga o'tish ➔", url=bot_url)]
+        ])
+        await message.reply(
+            "🎯 <b>Kunlik missiyalaringiz shaxsiy lichkangizga yuborildi!</b>\n"
+            "<i>Missiyalarni ko'rish uchun pastdagi tugmani bosing:</i>",
+            parse_mode="HTML",
+            reply_markup=group_kb
+        )
+        try:
+            await message.bot.send_message(user_id, text, parse_mode="HTML", reply_markup=kb)
+        except Exception:
+            pass
+        return
+
     await message.answer(text, parse_mode="HTML", reply_markup=kb)
 
 @router.callback_query(F.data.startswith("claim_q_"))
@@ -52,12 +71,21 @@ async def handle_claim_quest(call: CallbackQuery):
         await call.answer("❌ Bu topshiriq hali bajarilmagan yoki sovg'asi olingan!", show_alert=True)
         return
 
-    await call.answer("🎉 Sovg'a hisobingizga qo'shildi!", show_alert=True)
-    await call.message.answer(
+    claim_txt = (
         f"🎉 <b>TABRIKLAYMIZ! TOPSHIRIQ SOVG'ASI OLINDI!</b>\n\n"
         f"Siz <b>{res['title']}</b> topshirig'ini bajardingiz!\n"
         f"💰 <b>+{res['reward_pul']:,} Pul</b> va 💎 <b>+{res['reward_almaz']} Almaz</b> berildi!"
     )
+    if call.message.chat.type in ["group", "supergroup"]:
+        try:
+            await call.bot.send_message(call.from_user.id, claim_txt, parse_mode="HTML")
+            await call.answer("🎉 Sovg'a shaxsiy lichkangizga yuborildi!", show_alert=False)
+        except Exception:
+            await call.answer("🎉 Sovg'a hisobingizga qo'shildi!", show_alert=True)
+        return
+
+    await call.answer("🎉 Sovg'a hisobingizga qo'shildi!", show_alert=True)
+    await call.message.answer(claim_txt, parse_mode="HTML")
 
 # --- 2. ACHIEVEMENTS & MEDALS ---
 
@@ -80,6 +108,24 @@ async def show_achievements(message: Message):
             f"   <i>{a['description']}</i>\n"
             f"   🎁 Sovg'a: <b>{a['reward_pul']:,} Pul</b> | 💎 <b>{a['reward_almaz']} Almaz</b>\n\n"
         )
+
+    if message.chat.type in ["group", "supergroup"]:
+        bot_info = await message.bot.get_me()
+        bot_url = f"https://t.me/{bot_info.username}?start=achievements"
+        group_kb = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🤖 Botga o'tish ➔", url=bot_url)]
+        ])
+        await message.reply(
+            "🏅 <b>Yutuqlar va medallaringiz shaxsiy lichkangizga yuborildi!</b>\n"
+            "<i>Ko'rish uchun pastdagi tugmani bosing:</i>",
+            parse_mode="HTML",
+            reply_markup=group_kb
+        )
+        try:
+            await message.bot.send_message(user_id, text, parse_mode="HTML")
+        except Exception:
+            pass
+        return
 
     await message.answer(text, parse_mode="HTML")
 
