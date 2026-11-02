@@ -48,14 +48,14 @@ async def test_all():
     print("Ban / Unban toggle verified.")
 
     print("\n--- 4. Testing Level Up & Rewards ---")
-    # Add XP to trigger level up to 2 (requires 150 XP)
-    res_lvl2 = await db.add_xp(admin_id, 160)
+    # Add XP to trigger level up to 2 (requires 250 XP)
+    res_lvl2 = await db.add_xp(admin_id, 260)
     assert res_lvl2["leveled_up"] is True
     assert res_lvl2["new_level"] == 2
     print(f"Level 2 reached: reward={res_lvl2['rewards']}")
 
-    # Add XP to trigger level up to 3 (requires 300 XP)
-    res_lvl3 = await db.add_xp(admin_id, 320)
+    # Add XP to trigger level up to 3 (requires 500 XP)
+    res_lvl3 = await db.add_xp(admin_id, 520)
     assert res_lvl3["leveled_up"] is True
     assert res_lvl3["new_level"] == 3
     print(f"Level 3 reached: reward={res_lvl3['rewards']}")

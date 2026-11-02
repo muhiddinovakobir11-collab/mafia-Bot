@@ -537,25 +537,12 @@ class Database:
             current_level += 1
             leveled_up = True
 
-            # Balanced rewards per level
-            if current_level == 2:
-                rewards.append({"pul": 50, "almaz": 1, "item": None, "msg": "50 💰 Pul va 1 💎 Almaz"})
-                await self.update_balance(user_id, pul_diff=50, almaz_diff=1)
-            elif current_level == 3:
-                rewards.append({"pul": 100, "almaz": 2, "item": None, "msg": "100 💰 Pul va 2 💎 Almaz"})
-                await self.update_balance(user_id, pul_diff=100, almaz_diff=2)
-            elif current_level == 4:
-                rewards.append({"pul": 150, "almaz": 3, "item": None, "msg": "150 💰 Pul va 3 💎 Almaz"})
-                await self.update_balance(user_id, pul_diff=150, almaz_diff=3)
-            elif current_level == 5:
-                rewards.append({"pul": 250, "almaz": 5, "item": "qalqon", "msg": "250 💰 Pul, 5 💎 Almaz va 🛡️ Qalqon"})
-                await self.update_balance(user_id, pul_diff=250, almaz_diff=5)
-                await self.add_inventory_item(user_id, "qalqon", 1)
-            else:
-                p = current_level * 40
-                a = max(1, current_level // 2)
-                rewards.append({"pul": p, "almaz": a, "item": None, "msg": f"{a} 💎 Almaz va {p} 💰 Pul"})
-                await self.update_balance(user_id, pul_diff=p, almaz_diff=a)
+            from game.levels import get_reward_for_level
+            rew = get_reward_for_level(current_level)
+            rewards.append(rew)
+            await self.update_balance(user_id, pul_diff=rew.get("pul", 0), almaz_diff=rew.get("almaz", 0))
+            if rew.get("item"):
+                await self.add_inventory_item(user_id, rew["item"], 1)
 
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute("UPDATE users SET level = ?, xp = ? WHERE id = ?;", (current_level, current_xp, user_id))

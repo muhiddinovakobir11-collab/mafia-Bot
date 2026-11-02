@@ -22,7 +22,13 @@ async def handle_night_action(call: CallbackQuery):
         return
 
     target = room.get_player(target_id)
-    if not target or not target.is_alive:
+    if not target:
+        await call.answer("❌ Tanlangan o'yinchi topilmadi!", show_alert=True)
+        return
+
+    # Necromancy/autopsy/resurrection roles can target dead players
+    dead_target_roles = ["sehrgar", "patolog", "nekromant"]
+    if player.role_code not in dead_target_roles and not target.is_alive:
         await call.answer("❌ Tanlangan o'yinchi tirik emas!", show_alert=True)
         return
 
@@ -40,7 +46,7 @@ async def handle_night_action(call: CallbackQuery):
     # Sync with Mafia teammates in secret DM
     if r and r.team == Team.MAFIA:
         for teammate in room.get_alive_players():
-            if teammate.user_id != player.user_id and ROLES[teammate.role_code].team == Team.MAFIA:
+            if teammate.user_id != player.user_id and ROLES.get(teammate.role_code) and ROLES[teammate.role_code].team == Team.MAFIA:
                 await room.send_dm(
                     teammate.user_id,
                     f"👥 <b>Mafiya sherigingiz {player.full_name}</b> bu kecha nishon qilib <b>{target.full_name}</b>ni tanladi!"
@@ -49,4 +55,3 @@ async def handle_night_action(call: CallbackQuery):
     # Smart Night: if all active roles completed their choice, wake town up early!
     if room.check_all_night_actions_done() and room.night_event:
         room.night_event.set()
-

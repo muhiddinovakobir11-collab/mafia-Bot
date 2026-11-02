@@ -28,6 +28,12 @@ class Player:
         self.is_bot: bool = False
         self.afk_rounds: int = 0
         self.self_heal_count: int = 0
+        self.lives: int = 1
+        self.cannot_vote: bool = False
+        self.is_jailed: bool = False
+        self.court_immune: bool = False
+        self.framed_as_mafia: bool = False
+        self.is_bunkered: bool = False
 
     @property
     def tag(self) -> str:
@@ -200,6 +206,8 @@ class GameRoom:
         for p in player_list:
             role_code = p.role_code
             r_info = ROLES[role_code]
+            if role_code == "qariya":
+                p.lives = 2
 
             # Check inventory for shield or mask
             inv = await db.get_inventory(p.user_id)
@@ -266,9 +274,15 @@ class GameRoom:
         settings = await db.get_group_settings(self.chat_id)
         night_time = settings.get("night_time", NIGHT_TIMEOUT)
 
-        # Reset night targets
+        # Reset night targets & temporary round modifiers
         for p in self.get_alive_players():
             p.night_target_id = None
+            p.cannot_vote = False
+            p.is_jailed = False
+            p.court_immune = False
+            p.framed_as_mafia = False
+            p.is_bunkered = False
+            p.extra_votes = 0
 
         if self.round_number == 1:
             await self.broadcast_group(
@@ -305,11 +319,19 @@ class GameRoom:
                 continue
 
             # Intelligent target list
-            if r_info.team == Team.MAFIA:
+            dead_players = [d for d in self.players.values() if not d.is_alive]
+            if r_info.code in ["patolog", "nekromant"]:
+                targets = dead_players if dead_players else [t for t in alive if t.user_id != p.user_id]
+            elif r_info.code == "sehrgar":
+                targets = dead_players if dead_players else [t for t in alive if t.user_id != p.user_id]
+            elif r_info.code in ["qora_shifokor", "kontrabandist"]:
+                maf_targets = [t for t in alive if ROLES.get(t.role_code) and ROLES[t.role_code].team == Team.MAFIA]
+                targets = maf_targets if maf_targets else list(alive)
+            elif r_info.team == Team.MAFIA:
                 targets = [t for t in alive if t.user_id != p.user_id and ROLES.get(t.role_code) and ROLES[t.role_code].team != Team.MAFIA]
                 if not targets:
                     targets = [t for t in alive if t.user_id != p.user_id]
-            elif r_info.code == "laborant":
+            elif r_info.code in ["laborant", "qo_riqchi", "veteran", "omon_koluvchi"]:
                 targets = list(alive)
             else:
                 targets = [t for t in alive if t.user_id != p.user_id]
@@ -373,31 +395,97 @@ class GameRoom:
         alive = self.get_alive_players()
         alive_map = {p.user_id: p for p in alive}
 
-        # 1. Check Kazanova and Ogri (distraction / theft)
+        # --- Phase 1: Distractions, Jails & Disablers ---
         distracted_user_ids = set()
-        for p in alive:
-            if p.role_code in ["kazanova", "ogri"] and p.night_target_id in alive_map:
-                distracted_user_ids.add(p.night_target_id)
-                actor_title = "Kazanova" if p.role_code == "kazanova" else "O'g'ri"
-                await self.send_dm(
-                    p.night_target_id,
-                    f"💃 <b>{actor_title} sizni chalg'itdi (tunab ketdi)!</b> Bu kecha hech qanday harakat qila olmadingiz."
-                )
+        jailed_user_ids = set()
 
-        # 2. Check Laborant heal (max 1 self-heal)
-        healed_user_id = None
         for p in alive:
-            if p.role_code == "laborant" and p.user_id not in distracted_user_ids:
+            if p.night_target_id in alive_map:
+                target = alive_map[p.night_target_id]
+                if p.role_code in ["kazanova", "ogri", "shantajchi"]:
+                    distracted_user_ids.add(target.user_id)
+                    title = "Kazanova" if p.role_code == "kazanova" else "O'g'ri" if p.role_code == "ogri" else "Shantajchi"
+                    await self.send_dm(
+                        target.user_id,
+                        f"💃 <b>{title} sizning rejangizni buzdi!</b> Bu kecha hech qanday harakat qila olmadingiz."
+                    )
+                elif p.role_code == "uchastkovoy":
+                    jailed_user_ids.add(target.user_id)
+                    target.is_jailed = True
+                    distracted_user_ids.add(target.user_id)
+                    await self.send_dm(
+                        target.user_id,
+                        "👮 <b>Uchastka Noziri sizni uy qamog'iga oldi!</b> Tungi harakatingiz to'xtatildi, lekin uyingiz ham to'liq qo'riqlanmoqda."
+                    )
+                elif p.role_code == "jallod":
+                    distracted_user_ids.add(target.user_id)
+                    target.cannot_vote = True
+                    await self.send_dm(
+                        target.user_id,
+                        "⛓️ <b>Qonli Jallod sizni zanjirband qildi!</b> Ertaga kunduzgi sudda ovoz bera olmaysiz."
+                    )
+                elif p.role_code == "bandit":
+                    target.cannot_vote = True
+                    await self.send_dm(
+                        target.user_id,
+                        "🦹‍♂️ <b>Bandit sizni to'pponcha bilan qo'rqitib ketdi!</b> Qo'rquv tufayli ertaga ovoz berishda qatnasholmaysiz."
+                    )
+                elif p.role_code == "ruhoniy":
+                    t_role = ROLES.get(target.role_code)
+                    if t_role and t_role.team in [Team.MAFIA, Team.MANIAC, Team.VAMPIRE]:
+                        target.cannot_vote = True
+                        await self.send_dm(
+                            target.user_id,
+                            "⛪ <b>Ruhoniy qoshingizga keldi!</b> Gunohlaringiz og'irligi tufayli ertaga ovoz bera olmaysiz."
+                        )
+                elif p.role_code == "mantiqchi":
+                    target.extra_votes += 1
+                    await self.send_dm(
+                        target.user_id,
+                        "🧠 <b>Mantiqchi sizning dalillaringizni kuchaytirdi!</b> Ertaga kunduzgi ovozingiz 2 barobar hisoblanadi."
+                    )
+                elif p.role_code == "advokat_shahar":
+                    target.court_immune = True
+                    await self.send_dm(
+                        target.user_id,
+                        "⚖️ <b>Himoyachi Advokat sizni himoyaga oldi!</b> Ertangi kunduzgi sudda sizni dorga osishmaydi."
+                    )
+                elif p.role_code == "provokator":
+                    target.framed_as_mafia = True
+                elif p.role_code == "omon_koluvchi" and p.night_target_id == p.user_id:
+                    p.is_bunkered = True
+                    await self.send_dm(p.user_id, "⛺ <b>Maxfiy bunkerga yashirindingiz!</b> Bu kecha har qanday hujumdan xavfsizsiz.")
+
+        # --- Phase 2: Protections, Heals & Guards ---
+        healed_user_ids = set()
+        bodyguard_pair = None  # (bodyguard_id, guarded_target_id)
+        guarded_by_town = set()
+
+        for p in alive:
+            if p.user_id in distracted_user_ids or not p.night_target_id:
+                continue
+
+            if p.role_code == "laborant":
                 if p.night_target_id == p.user_id:
                     if p.self_heal_count >= 1:
-                        await self.send_dm(p.user_id, "⚠️ <i>Siz o'zingizni bir o'yinda faqat 1 marta davolay olasiz! Davolash ish bermadi.</i>")
+                        await self.send_dm(p.user_id, "⚠️ <i>O'zingizni faqat 1 marta davolay olasiz!</i>")
                     else:
                         p.self_heal_count += 1
-                        healed_user_id = p.night_target_id
+                        healed_user_ids.add(p.night_target_id)
                 else:
-                    healed_user_id = p.night_target_id
+                    healed_user_ids.add(p.night_target_id)
 
-        # 3. Kupidon: link lovers on Round 1
+            elif p.role_code == "qora_shifokor":
+                healed_user_ids.add(p.night_target_id)
+                await self.send_dm(p.user_id, "💉 <b>Mafiya a'zosini yashirin davoladingiz!</b>")
+
+            elif p.role_code == "tansoqchi":
+                bodyguard_pair = (p.user_id, p.night_target_id)
+
+            elif p.role_code in ["shahar_soqchisi", "tez_yordam", "qo_riqchi"]:
+                guarded_by_town.add(p.night_target_id)
+
+        # --- Phase 3: Kupidon Linking (Round 1) ---
         for p in alive:
             if p.role_code == "kupidon" and self.round_number == 1 and not self.lovers:
                 if p.night_target_id and p.night_target_id in alive_map:
@@ -408,115 +496,236 @@ class GameRoom:
                         self.lovers = [t1_id, t2_id]
                         l1 = alive_map[t1_id]
                         l2 = alive_map[t2_id]
-                        await self.send_dm(t1_id, f"💘 <b>Kupidon kamoni sizni bog'ladi!</b>\nSizning sevgan yoringiz: <b>{l2.full_name}</b>!\nAgar biringiz o'lsangiz, ikkinchingiz ham qayg'udan vafot etasiz!")
-                        await self.send_dm(t2_id, f"💘 <b>Kupidon kamoni sizni bog'ladi!</b>\nSizning sevgan yoringiz: <b>{l1.full_name}</b>!\nAgar biringiz o'lsangiz, ikkinchingiz ham qayg'udan vafot etasiz!")
+                        await self.send_dm(t1_id, f"💘 <b>Kupidon kamoni sizni bog'ladi!</b>\nSizning sevgan yoringiz: <b>{l2.full_name}</b>!")
+                        await self.send_dm(t2_id, f"💘 <b>Kupidon kamoni sizni bog'ladi!</b>\nSizning sevgan yoringiz: <b>{l1.full_name}</b>!")
 
-        # 4. Mafia/Don kill target
-        mafia_target_id = None
-        for p in alive:
-            if p.role_code in ["don", "mafia"] and p.user_id not in distracted_user_ids:
-                if p.night_target_id:
-                    mafia_target_id = p.night_target_id
-                    break
-
-        # 5. Qotil (Maniac) kill target
-        maniac_target_id = None
-        for p in alive:
-            if p.role_code == "kotil" and p.user_id not in distracted_user_ids:
-                maniac_target_id = p.night_target_id
-
-        # 6. Ximik poison target
-        for p in alive:
-            if p.role_code == "ximik" and p.user_id not in distracted_user_ids:
-                if p.night_target_id in alive_map:
-                    alive_map[p.night_target_id].is_poisoned = True
-                    await self.send_dm(p.night_target_id, "🧪 <i>Siz kimyoviy moddadan zaharlandingiz! Agar zardob olmasangiz, kun oxirida halok bo'lasiz...</i>")
-
-        # 7. Advokat (Mafiya Himoyachisi)
+        # --- Phase 4: Investigations, Tracking & Scouting ---
         lawyer_target_id = None
         for p in alive:
             if p.role_code == "advokat" and p.user_id not in distracted_user_ids:
                 lawyer_target_id = p.night_target_id
 
-        # 8. Shpion (Spy) investigation report
         for p in alive:
-            if p.role_code == "shpion" and p.user_id not in distracted_user_ids:
-                if p.night_target_id and p.night_target_id in alive_map:
-                    target_player = alive_map[p.night_target_id]
-                    visitors = [v.full_name for v in alive if v.user_id != p.user_id and v.night_target_id == target_player.user_id]
-                    if visitors:
-                        vis_txt = ", ".join(visitors)
-                        await self.send_dm(p.user_id, f"🕶️ <b>Ayg'oqchilik hisoboti:</b>\n{target_player.full_name}ning uyiga bu kecha <b>{vis_txt}</b> keldi!")
-                    else:
-                        await self.send_dm(p.user_id, f"🕶️ <b>Ayg'oqchilik hisoboti:</b>\n{target_player.full_name}ning uyiga bu kecha hech kim kelmadi.")
+            if p.user_id in distracted_user_ids or not p.night_target_id:
+                continue
 
-        # 9. Komissar investigation reports (also shared with Serjant)
-        for p in alive:
-            if p.role_code == "komissar" and p.user_id not in distracted_user_ids:
-                if p.night_target_id in alive_map:
-                    target_player = alive_map[p.night_target_id]
-                    t_role = ROLES[target_player.role_code]
-                    if target_player.has_mask or target_player.user_id == lawyer_target_id:
-                        report = "🔍 <b>Tekshiruv natijasi:</b> Bu shaxs toza, shahar fuqarosi!"
-                    elif t_role.team == Team.MAFIA:
-                        report = f"🚨 <b>Tekshiruv natijasi:</b> DIQQAT! {target_player.full_name} — <b>MAFIYA a'zosi!</b>"
-                    elif t_role.team == Team.MANIAC:
-                        report = f"🚨 <b>Tekshiruv natijasi:</b> DIQQAT! {target_player.full_name} — <b>QONXO'R QOTIL!</b>"
-                    else:
-                        report = f"🔍 <b>Tekshiruv natijasi:</b> {target_player.full_name} — Tinch shahar vakili."
-                    await self.send_dm(p.user_id, report)
-                    for s in alive:
-                        if s.role_code == "serjant":
-                            await self.send_dm(s.user_id, f"🕵️‍♂️ <b>Komissar surishtiruvi hisoboti:</b>\n{report}")
+            target = alive_map.get(p.night_target_id)
+            if not target:
+                continue
 
-        # 10. Sehrgar (Nekromant / Tirilish)
+            t_role = ROLES.get(target.role_code)
+
+            if p.role_code == "komissar":
+                if target.has_mask or target.user_id == lawyer_target_id:
+                    report = "🔍 <b>Tekshiruv natijasi:</b> Bu shaxs toza, shahar fuqarosi!"
+                elif target.framed_as_mafia or (t_role and t_role.team == Team.MAFIA):
+                    report = f"🚨 <b>Tekshiruv natijasi:</b> DIQQAT! {target.full_name} — <b>MAFIYA a'zosi!</b>"
+                elif t_role and t_role.team == Team.MANIAC:
+                    report = f"🚨 <b>Tekshiruv natijasi:</b> DIQQAT! {target.full_name} — <b>QONXO'R QOTIL!</b>"
+                else:
+                    report = f"🔍 <b>Tekshiruv natijasi:</b> {target.full_name} — Tinch shahar vakili."
+                await self.send_dm(p.user_id, report)
+                for s in alive:
+                    if s.role_code == "serjant":
+                        await self.send_dm(s.user_id, f"🕵️‍♂️ <b>Komissar surishtiruvi hisoboti:</b>\n{report}")
+
+            elif p.role_code == "detektiv":
+                visited_id = target.night_target_id
+                if visited_id and visited_id in alive_map:
+                    v_name = alive_map[visited_id].full_name
+                    await self.send_dm(p.user_id, f"🕵️ <b>Detektiv izquvarligi:</b> {target.full_name} bu kecha <b>{v_name}</b>ning uyiga bordi!")
+                else:
+                    await self.send_dm(p.user_id, f"🕵️ <b>Detektiv izquvarligi:</b> {target.full_name} bu kecha hech kimnikiga bormadi.")
+
+            elif p.role_code == "psixolog":
+                is_evil = t_role and (t_role.team in [Team.MAFIA, Team.MANIAC] or t_role.action_type in ["kill", "mafia_kill", "butcher_kill"])
+                if is_evil:
+                    await self.send_dm(p.user_id, f"🛋️ <b>Psixolog tashxisi:</b> {target.full_name}ning qo'llarida <b>qon asorati</b> bor (Qotil/Mafioz)!")
+                else:
+                    await self.send_dm(p.user_id, f"🛋️ <b>Psixolog tashxisi:</b> {target.full_name} ruhiyati toza, tinch shahar fuqarosi.")
+
+            elif p.role_code == "jurnalist":
+                is_town = t_role and t_role.team == Team.CITIZEN
+                team_txt = "🕊️ Shahar (Citizen)" if is_town else "🐺 Qora kuchlar / Mafiya"
+                await self.send_dm(p.user_id, f"📰 <b>Jurnalist hisoboti:</b> {target.full_name} — <b>{team_txt}</b> safida!")
+
+            elif p.role_code == "inspektor":
+                is_maf = target.framed_as_mafia or (t_role and t_role.team == Team.MAFIA)
+                if is_maf:
+                    await self.send_dm(p.user_id, f"🧐 <b>Soliq auditi:</b> {target.full_name} hisobida noqonuniy mafiya mablag'lari fosh etildi!")
+                else:
+                    await self.send_dm(p.user_id, f"🧐 <b>Soliq auditi:</b> {target.full_name} toza fuqaro, shubhali hisoblar yo'q.")
+
+            elif p.role_code == "ayg_oqchi_mafiya":
+                r_txt = f"{t_role.emoji} {t_role.name}" if t_role else "Oddiy"
+                await self.send_dm(p.user_id, f"🥷 <b>Mafiya razvedkasi:</b> {target.full_name}ning asl roli — <b>{r_txt}</b>!")
+
+            elif p.role_code == "shpion":
+                visitors = [v.full_name for v in alive if v.user_id != p.user_id and v.night_target_id == target.user_id]
+                vis_txt = ", ".join(visitors) if visitors else "hech kim kelmadi"
+                await self.send_dm(p.user_id, f"🕶️ <b>Ayg'oqchilik hisoboti:</b> {target.full_name}ning uyiga <b>{vis_txt}</b>!")
+
+        # Autopsy & Necromancy on dead players
         for p in alive:
-            if p.role_code == "sehrgar" and p.user_id not in distracted_user_ids:
-                if p.night_target_id and p.night_target_id in self.players:
-                    t_dead = self.players[p.night_target_id]
-                    if not t_dead.is_alive:
-                        t_dead.is_alive = True
-                        await self.broadcast_group(
-                            f"🧙‍♂️ <b>SEHRGAR MO'JIZASI!</b>\n"
-                            f"Sehrgar o'lim komasidagi {t_dead.tag}ni tiriltirib hayotga qaytardi!"
-                        )
+            if p.user_id not in distracted_user_ids and p.night_target_id in self.players:
+                target = self.players[p.night_target_id]
+                if not target.is_alive:
+                    if p.role_code == "patolog":
+                        await self.send_dm(p.user_id, f"🔬 <b>Ekspertiza xulosasi:</b> {target.full_name} qotillik qurboni bo'lgan.")
+                    elif p.role_code == "nekromant":
+                        await self.send_dm(p.user_id, f"💀 <b>Ruhlar ovozi:</b> {target.full_name}ning ruhi faryod urmoqda...")
+                    elif p.role_code == "sehrgar":
+                        target.is_alive = True
+                        await self.broadcast_group(f"🧙‍♂️ <b>SEHRGAR MO'JIZASI!</b>\nSehrgar {target.tag}ni tiriltirib hayotga qaytardi!")
                         break
 
-        # Collect victims (1-tunda, ya'ni Tanishuv tunida qotillik sodir bo'lmaydi)
-        killed_ids = set()
+        # --- Phase 5: Poisons & Vampire Conversions ---
+        for p in alive:
+            if p.user_id in distracted_user_ids or not p.night_target_id:
+                continue
+
+            target = alive_map.get(p.night_target_id)
+            if not target:
+                continue
+
+            if p.role_code in ["ximik", "zaharlovchi"]:
+                target.is_poisoned = True
+                await self.send_dm(target.user_id, "🧪 <i>Siz zaharlandingiz! Kun oxirida jon berishingiz mumkin...</i>")
+
+            elif p.role_code == "vampir_graf":
+                t_role = ROLES.get(target.role_code)
+                if t_role and t_role.team == Team.CITIZEN:
+                    target.role_code = "vampir"
+                    await self.send_dm(
+                        target.user_id,
+                        "🧛 <b>GRAF DRAKULA SIZNI CHAQDI!</b>\n"
+                        "Siz endi VAMPIRLAR to'dasisiz! Zulmat kuchlariga xizmat qiling!"
+                    )
+
+        # --- Phase 6: Attacks & Executions ---
+        attack_dict: Dict[int, List[dict]] = {}
+
         if self.round_number > 1:
-            if mafia_target_id and mafia_target_id in alive_map:
-                killed_ids.add(mafia_target_id)
-            if maniac_target_id and maniac_target_id in alive_map:
-                killed_ids.add(maniac_target_id)
+            # 1. Mafia attacks
+            for p in alive:
+                if p.user_id in distracted_user_ids or not p.night_target_id:
+                    continue
+                if p.role_code in ["don", "mafia", "kadr"]:
+                    attack_dict.setdefault(p.night_target_id, []).append({
+                        "attacker_id": p.user_id, "piercing": False, "source": "Mafiya"
+                    })
+                    break
 
-        # Check if saved by heal, shield or items
+            # 2. Special Mafia attackers
+            for p in alive:
+                if p.user_id in distracted_user_ids or not p.night_target_id:
+                    continue
+                if p.role_code == "suqasdqor":
+                    attack_dict.setdefault(p.night_target_id, []).append({
+                        "attacker_id": p.user_id, "piercing": True, "source": "Yollanma Qotil"
+                    })
+                elif p.role_code == "snayper_mafiya":
+                    attack_dict.setdefault(p.night_target_id, []).append({
+                        "attacker_id": p.user_id, "piercing": False, "source": "Mafiya Mergani"
+                    })
+
+            # 3. Maniacs and beasts
+            for p in alive:
+                if p.user_id in distracted_user_ids or not p.night_target_id:
+                    continue
+                if p.role_code == "kotil":
+                    attack_dict.setdefault(p.night_target_id, []).append({
+                        "attacker_id": p.user_id, "piercing": False, "source": "Maniak"
+                    })
+                elif p.role_code == "qonxor":
+                    attack_dict.setdefault(p.night_target_id, []).append({
+                        "attacker_id": p.user_id, "piercing": True, "source": "Qonxo'r Qassob"
+                    })
+                elif p.role_code == "bori":
+                    attack_dict.setdefault(p.night_target_id, []).append({
+                        "attacker_id": p.user_id, "piercing": True, "source": "Bo'riodam"
+                    })
+                elif p.role_code == "yirtqich":
+                    attack_dict.setdefault(p.night_target_id, []).append({
+                        "attacker_id": p.user_id, "piercing": False, "source": "Yirtqich"
+                    })
+
+            # 4. Town Sniper
+            for p in alive:
+                if p.role_code == "snayper" and p.user_id not in distracted_user_ids and p.night_target_id:
+                    attack_dict.setdefault(p.night_target_id, []).append({
+                        "attacker_id": p.user_id, "piercing": False, "source": "Snayper"
+                    })
+
+            # 5. Veteran trap (alert)
+            for p in alive:
+                if p.role_code == "veteran" and p.user_id not in distracted_user_ids and p.night_target_id == p.user_id:
+                    for visitor in alive:
+                        if visitor.user_id != p.user_id and visitor.night_target_id == p.user_id:
+                            attack_dict.setdefault(visitor.user_id, []).append({
+                                "attacker_id": p.user_id, "piercing": True, "source": "Urush Veterani"
+                            })
+
+        # --- Phase 7: Resolve Attacks against Defenses ---
         actually_killed: List[Player] = []
-        for vid in killed_ids:
-            victim = alive_map[vid]
-            if vid == healed_user_id:
-                continue
-            if victim.has_shield:
-                victim.has_shield = False
-                await self.send_dm(vid, "🛡️ <b>Qalqoningiz bu kecha sizni o'limdan saqlab qoldi!</b>")
+
+        for victim_id, attacks in attack_dict.items():
+            victim = alive_map.get(victim_id)
+            if not victim or not victim.is_alive:
                 continue
 
-            inv = await db.get_inventory(vid)
-            # Protection from Maniac
-            if vid == maniac_target_id:
-                has_maniac_prot = any(it["code"] == "qotil_himoya" and it["quantity"] > 0 for it in inv)
-                if has_maniac_prot:
-                    await db.consume_inventory_item(vid, "qotil_himoya", 1)
-                    await self.send_dm(vid, "⛑️ <b>Qotilga qarshi himoyangiz sizni Maniak hujumidan saqlab qoldi!</b>")
+            # Immunity checks
+            if victim.is_jailed:
+                await self.send_dm(victim_id, "🛡️ <b>Uy qamog'ida bo'lganingiz tufayli suiqasddan omon qoldingiz!</b>")
+                continue
+
+            if victim.is_bunkered:
+                await self.send_dm(victim_id, "⛺ <b>Bunkerda yashiringaningiz tufayli omon qoldingiz!</b>")
+                continue
+
+            # Bodyguard (Tansoqchi) sacrifice
+            if bodyguard_pair and bodyguard_pair[1] == victim_id:
+                bg_id = bodyguard_pair[0]
+                bodyguard = alive_map.get(bg_id)
+                if bodyguard and bodyguard.is_alive:
+                    bodyguard.is_alive = False
+                    actually_killed.append(bodyguard)
+                    first_attacker_id = attacks[0]["attacker_id"]
+                    attacker = alive_map.get(first_attacker_id)
+                    if attacker and attacker.is_alive and attacker.user_id != bg_id:
+                        attacker.is_alive = False
+                        actually_killed.append(attacker)
+                    await self.broadcast_group(
+                        f"💂 <b>TANSOQCHI JASORATI!</b>\n"
+                        f"Tansoqchi o'z joni evaziga {victim.tag}ni saqlab qoldi va tajovuzkorni ham yo'q qildi!"
+                    )
                     continue
 
-            # Omadli tanga chance
-            has_lucky_coin = any(it["code"] == "omadli_tanga" and it["quantity"] > 0 for it in inv)
-            if has_lucky_coin and random.random() < 0.35:
-                await self.send_dm(vid, "🎲 <b>Omadli tanga tufayli suiqasddan mo'jizaviy qutulib qoldingiz!</b>")
+            # Doctor / Paramedic heal
+            has_piercing = any(atk["piercing"] for atk in attacks)
+            if not has_piercing and (victim_id in healed_user_ids or victim_id in guarded_by_town):
+                await self.send_dm(victim_id, "💉 <b>Shifokor / Soqchi bu kecha sizni o'limdan saqlab qoldi!</b>")
                 continue
 
-            # Mashinalar orqali suiqasddan qochish ehtimoli
+            # Shield item check
+            if not has_piercing and victim.has_shield:
+                victim.has_shield = False
+                await self.send_dm(victim_id, "🛡️ <b>Qalqoningiz bu kecha sizni o'limdan saqlab qoldi!</b>")
+                continue
+
+            # Omadli darvesh (50% passive dodge)
+            if victim.role_code == "omadli_darvesh" and random.random() < 0.50:
+                await self.send_dm(victim_id, "🧙 <b>Omadli Darvesh mo'jizaviy tarzda o'limdan qutulib qoldi!</b>")
+                continue
+
+            # Qariya (Elder - has 2 lives)
+            if victim.role_code == "qariya" and victim.lives > 1:
+                victim.lives -= 1
+                await self.send_dm(victim_id, "👴 <b>Oqsoqol birinchi og'ir jarohatdan omon qoldi! (1 ta jon qoldi)</b>")
+                continue
+
+            # Car escape rates
+            inv = await db.get_inventory(victim_id)
             car_rates = [
                 ("mashina_batmobile", 0.75, "🦇 Batmobile Tumbler"),
                 ("mashina_koenigsegg", 0.68, "🌪️ Koenigsegg Jesko"),
@@ -543,30 +752,52 @@ class GameRoom:
             for car_code, chance, car_title in car_rates:
                 if any(it["code"] == car_code and it["quantity"] > 0 for it in inv):
                     if random.random() < chance:
-                        await self.send_dm(vid, f"🏎️ <b>{car_title} mashinangizda gazni bosib, tungi suiqasddan qochib qoldingiz!</b>")
+                        await self.send_dm(victim_id, f"🏎️ <b>{car_title} mashinangizda gazni bosib, tungi suiqasddan qochib qoldingiz!</b>")
                         car_escaped = True
                         break
             if car_escaped:
                 continue
 
+            # Death confirmed
             victim.is_alive = False
             actually_killed.append(victim)
 
-            # Konchi explosion revenge!
+            # Konchi bomb revenge
             if victim.role_code == "konchi":
-                killer_id = mafia_target_id if vid == mafia_target_id else maniac_target_id
-                if killer_id and killer_id in alive_map and killer_id != vid:
+                killer_id = attacks[0]["attacker_id"]
+                if killer_id and killer_id in alive_map and killer_id != victim_id:
                     killer = alive_map[killer_id]
                     killer.is_alive = False
                     actually_killed.append(killer)
 
-        # Sergeant promotion if Komissar dead
+            # Ovchi hunter death shot
+            if victim.role_code == "ovchi":
+                enemy_candidates = [
+                    p for p in alive
+                    if p.is_alive and p.user_id != victim_id and ROLES.get(p.role_code) and ROLES[p.role_code].team != Team.CITIZEN
+                ]
+                if not enemy_candidates:
+                    enemy_candidates = [p for p in alive if p.is_alive and p.user_id != victim_id]
+                if enemy_candidates:
+                    shot_target = random.choice(enemy_candidates)
+                    shot_target.is_alive = False
+                    actually_killed.append(shot_target)
+
+        # Check promotions
         komissar_dead = any(p.role_code == "komissar" and not p.is_alive for p in self.players.values())
         if komissar_dead:
             for p in self.get_alive_players():
                 if p.role_code == "serjant":
                     p.role_code = "komissar"
                     await self.send_dm(p.user_id, "⭐ <b>Komissar halok bo'ldi!</b> Endi siz shahar Komissarisiz va har kecha tekshira olasiz!")
+
+        don_dead = any(p.role_code == "don" and not p.is_alive for p in self.players.values())
+        if don_dead:
+            for p in self.get_alive_players():
+                if p.role_code == "kadr":
+                    p.role_code = "don"
+                    await self.send_dm(p.user_id, "👑 <b>Don halok bo'ldi!</b> Endi siz Mafiya Bossi (Don)siz va suiqasdlarga boshchilik qilasiz!")
+                    break
 
         # Announce morning results
         await self.run_day_phase(actually_killed)
@@ -713,7 +944,7 @@ class GameRoom:
         skip_count = 0
 
         for p in alive:
-            if not p.is_alive:
+            if not p.is_alive or p.cannot_vote:
                 continue
             if p.vote_target_id == -1:
                 skip_count += 1
@@ -721,7 +952,7 @@ class GameRoom:
                 weight = 1
                 if p.role_code == "rais":
                     weight += 1 # Rais 2x vote
-                weight += p.extra_votes # Extra vote items
+                weight += p.extra_votes # Extra vote items or Mantiqchi
                 vote_counts[p.vote_target_id] = vote_counts.get(p.vote_target_id, 0) + weight
 
         # Check max vote
@@ -732,14 +963,24 @@ class GameRoom:
 
             # Need at least 2 votes to lynch
             if top_votes > skip_count and top_votes >= 2:
+                candidate: Optional[Player] = None
                 # Check for tie
                 if len(sorted_votes) > 1 and sorted_votes[1][1] == top_votes:
-                    await self.broadcast_group(
-                        f"⚖️ <b>Ovozlar teng keldi!</b> ({top_votes} ta ovoz).\nHech kim osilmadi, shahar qarorga kela olmadi."
-                    )
+                    hakim = next((p for p in alive if p.role_code == "hakim" and p.vote_target_id in [top_target_id, sorted_votes[1][0]]), None)
+                    if hakim:
+                        candidate = alive_map[hakim.vote_target_id]
+                        await self.broadcast_group(
+                            f"👨‍⚖️ <b>BOSH HAKIMNING QAT'IY HUKMI!</b>\n"
+                            f"Ovozlar teng kelganligi sababli, Bosh Hakim {hakim.tag} o'z vakolatidan foydalanib yakuniy hukmni chiqardi!"
+                        )
+                    else:
+                        await self.broadcast_group(
+                            f"⚖️ <b>Ovozlar teng keldi!</b> ({top_votes} ta ovoz).\nHech kim osilmadi, shahar qarorga kela olmadi."
+                        )
                 else:
                     candidate = alive_map[top_target_id]
 
+                if candidate:
                     # 10s Defense phase / Oqlanish nutqi
                     await self.broadcast_group(
                         f"⚖️ <b>SUDNING DASTLABKI HUKMI!</b>\n\n"
@@ -748,54 +989,86 @@ class GameRoom:
                     )
                     await asyncio.sleep(10)
 
-                    # Check osilish_himoya (Dordan himoya)
-                    inv = await db.get_inventory(candidate.user_id)
-                    has_rope_prot = any(it["code"] == "osilish_himoya" and it["quantity"] > 0 for it in inv)
-                    if has_rope_prot:
-                        await db.consume_inventory_item(candidate.user_id, "osilish_himoya", 1)
+                    # Check court immunity (Advokat_shahar)
+                    if candidate.court_immune:
                         await self.broadcast_group(
-                            f"⚖️ <b>HIMOYA ISHLADI! ARQON UZILIB KETDI!</b>\n\n"
-                            f"{candidate.tag}ning bo'ynidagi arqon uzildi! U mo'jizaviy tarzda dor ostidan omon qoldi!"
+                            f"⚖️ <b>HIMOYACHI ADVOKAT ISBOTLADI!</b>\n\n"
+                            f"Himoyachi Advokat sudga dalillar taqdim etib, {candidate.tag}ni dorga osilishdan to'liq asrab qoldi!"
                         )
                     else:
-                        candidate.is_alive = False
-                        executed_player = candidate
-                        r = ROLES[executed_player.role_code]
-                        await self.broadcast_group(
-                            f"🪢 <b>SHAHAR SUDI HUKMI IJRO ETILDI!</b>\n\n"
-                            f"{executed_player.tag} dorga osildi!\n"
-                            f"Uning roli: {r.emoji} <b>{r.name}</b> edi!"
-                        )
-
-                        # Last will on lynching
-                        will = await db.get_last_will(executed_player.user_id)
-                        if will:
+                        # Check osilish_himoya (Dordan himoya)
+                        inv = await db.get_inventory(candidate.user_id)
+                        has_rope_prot = any(it["code"] == "osilish_himoya" and it["quantity"] > 0 for it in inv)
+                        if has_rope_prot:
+                            await db.consume_inventory_item(candidate.user_id, "osilish_himoya", 1)
                             await self.broadcast_group(
-                                f"📜 <b>{executed_player.tag}ning Dor Ostidagi So'nggi Vasiyati:</b>\n"
-                                f"<i>\"{will}\"</i>"
+                                f"⚖️ <b>HIMOYA ISHLADI! ARQON UZILIB KETDI!</b>\n\n"
+                                f"{candidate.tag}ning bo'ynidagi arqon uzildi! U mo'jizaviy tarzda dor ostidan omon qoldi!"
+                            )
+                        else:
+                            candidate.is_alive = False
+                            executed_player = candidate
+                            r = ROLES[executed_player.role_code]
+                            await self.broadcast_group(
+                                f"🪢 <b>SHAHAR SUDI HUKMI IJRO ETILDI!</b>\n\n"
+                                f"{executed_player.tag} dorga osildi!\n"
+                                f"Uning roli: {r.emoji} <b>{r.name}</b> edi!"
                             )
 
-                        # Terrorist blast check on vote
-                        if executed_player.role_code == "terrorist":
-                            voters = [p for p in alive if p.vote_target_id == executed_player.user_id and p.is_alive and p.user_id != executed_player.user_id]
-                            if voters:
-                                t_vic = random.choice(voters)
-                                t_vic.is_alive = False
+                            # Last will on lynching
+                            will = await db.get_last_will(executed_player.user_id)
+                            if will:
                                 await self.broadcast_group(
-                                    f"🧨 <b>TERRORIST PORTLASHI!</b>\n"
-                                    f"Terrorist osilish arafasida o'ziga ovoz bergan {t_vic.tag}ni ham portlatib yubordi!"
+                                    f"📜 <b>{executed_player.tag}ning Dor Ostidagi So'nggi Vasiyati:</b>\n"
+                                    f"<i>\"{will}\"</i>"
                                 )
 
-                        # Konchi blast check on vote
-                        if executed_player.role_code == "konchi":
-                            voters = [p for p in alive if p.vote_target_id == executed_player.user_id and p.is_alive]
-                            if voters:
-                                victim = voters[0]
-                                victim.is_alive = False
+                            # Masxaraboz (Jester) instant win condition!
+                            if executed_player.role_code == "masxaraboz":
+                                self.state = "GAME_OVER"
                                 await self.broadcast_group(
-                                    f"💣 <b>KONCHI PORTLASHI!</b>\n"
-                                    f"Konchi o'lar chog'ida o'ziga ovoz bergan {victim.tag}ni ham portlatib yubordi!"
+                                    f"🤡 <b>MASXARABOZ O'YINNI YUTDI!</b> 🤡\n\n"
+                                    f"{executed_player.tag} butun shaharni aldab, o'zini dorga ostirishga muvaffaq bo'ldi!\n"
+                                    f"Uning yagona maqsadi shu edi va u yakka o'zi g'alaba qozondi!"
                                 )
+                                await self.end_game(f"🤡 <b>MASXARABOZ ({executed_player.tag}) G'ALABA QOZONDI!</b>", Team.NEUTRAL)
+                                return
+
+                            # Ovchi (Hunter) revenge on lynch
+                            if executed_player.role_code == "ovchi":
+                                voters = [p for p in alive if p.vote_target_id == executed_player.user_id and p.is_alive and p.user_id != executed_player.user_id]
+                                if not voters:
+                                    voters = [p for p in alive if p.is_alive and p.user_id != executed_player.user_id]
+                                if voters:
+                                    shot_vic = random.choice(voters)
+                                    shot_vic.is_alive = False
+                                    r_shot = ROLES[shot_vic.role_code]
+                                    await self.broadcast_group(
+                                        f"🏹 <b>MERGAN OVCHINING SO'NGGI O'QI!</b>\n"
+                                        f"Ovchi dor ostida jon berayotib, qurolidan o'q uzdi va {shot_vic.tag} ({r_shot.emoji} <b>{r_shot.name}</b>)ni ham otib ketdi!"
+                                    )
+
+                            # Terrorist blast check on vote
+                            if executed_player.role_code == "terrorist":
+                                voters = [p for p in alive if p.vote_target_id == executed_player.user_id and p.is_alive and p.user_id != executed_player.user_id]
+                                if voters:
+                                    t_vic = random.choice(voters)
+                                    t_vic.is_alive = False
+                                    await self.broadcast_group(
+                                        f"🧨 <b>TERRORIST PORTLASHI!</b>\n"
+                                        f"Terrorist osilish arafasida o'ziga ovoz bergan {t_vic.tag}ni ham portlatib yubordi!"
+                                    )
+
+                            # Konchi blast check on vote
+                            if executed_player.role_code == "konchi":
+                                voters = [p for p in alive if p.vote_target_id == executed_player.user_id and p.is_alive]
+                                if voters:
+                                    victim = voters[0]
+                                    victim.is_alive = False
+                                    await self.broadcast_group(
+                                        f"💣 <b>KONCHI PORTLASHI!</b>\n"
+                                        f"Konchi o'lar chog'ida o'ziga ovoz bergan {victim.tag}ni ham portlatib yubordi!"
+                                    )
             else:
                 await self.broadcast_group("⚖️ <b>Sud natijasi:</b> Yetarli ovoz to'planmadi yoki 'O'tkazib yuborish' tanlandi. Hech kim osilmadi.")
         else:

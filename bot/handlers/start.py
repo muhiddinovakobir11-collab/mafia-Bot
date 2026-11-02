@@ -8,7 +8,7 @@ from aiogram.filters import CommandStart, Command
 from database.db import db
 from bot.keyboards import get_main_keyboard, get_profile_keyboard, get_shop_menu_keyboard, get_language_keyboard
 from bot.locales import get_text, LANGUAGES
-from game.roles import ROLES
+from game.roles import ROLES, Team
 
 router = Router()
 
@@ -25,6 +25,34 @@ async def cmd_start(message: Message):
         u = await db.get_or_create_user(user_id, username, full_name)
         full_card = await build_full_profile_card(u)
         await message.answer(full_card, parse_mode="HTML", reply_markup=get_profile_keyboard())
+        return
+
+    # Check direct roles encyclopedia deep link
+    if len(args) > 1 and args[1] == "roles":
+        town_cnt = sum(1 for r in ROLES.values() if r.team == Team.CITIZEN)
+        maf_cnt = sum(1 for r in ROLES.values() if r.team == Team.MAFIA)
+        maniac_cnt = sum(1 for r in ROLES.values() if r.team == Team.MANIAC)
+        vamp_cnt = sum(1 for r in ROLES.values() if r.team == Team.VAMPIRE)
+        neut_cnt = sum(1 for r in ROLES.values() if r.team == Team.NEUTRAL)
+        total_cnt = len(ROLES)
+
+        kb = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text=f"🏙 Shahar Kuchlari ({town_cnt} ta)", callback_data="roles_cat_citizen")],
+            [InlineKeyboardButton(text=f"🎩 Mafiya Sindikati ({maf_cnt} ta)", callback_data="roles_cat_mafia")],
+            [InlineKeyboardButton(text=f"🔪 Maniaklar va Yovuzlar ({maniac_cnt} ta)", callback_data="roles_cat_maniac")],
+            [InlineKeyboardButton(text=f"🧛 Vampirlar & Okkultizm ({vamp_cnt} ta)", callback_data="roles_cat_vampire")],
+            [InlineKeyboardButton(text=f"⚖️ Neytrallar & Mustaqil ({neut_cnt} ta)", callback_data="roles_cat_neutral")],
+        ])
+
+        await message.answer(
+            f"🎭 <b>MAFIA BOT — BARCHA ROLLLAR ENSIKLOPEDIYASI</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━━\n"
+            f"O'yinda jami <b>{total_cnt} ta maxsus qobiliyatli rol</b> mavjud!\n"
+            f"Botda zerikarli oddiy tinch aholi yo'q — har bir o'yinchining o'z maxfiy missiyasi va kuchi bor.\n\n"
+            f"Kerakli toifani tanlang:",
+            reply_markup=kb,
+            parse_mode="HTML"
+        )
         return
     if len(args) > 1 and args[1].startswith("join_"):
         try:
@@ -601,16 +629,108 @@ async def referral_link(message: Message):
 @router.message(F.text.contains("O'yin qoidalari"))
 @router.message(Command("roles"))
 async def game_roles_help(message: Message):
-    text = "📖 <b>O'YINNING BARCHA AKTIV ROLLARI VA QOIDALARI:</b>\n\n"
-    for code, r in ROLES.items():
-        text += f"{r.emoji} <b>{r.name}</b> ({r.team.value.upper()}):\n"
-        text += f"   <i>{r.description}</i>\n\n"
+    bot_info = await message.bot.get_me()
+    town_cnt = sum(1 for r in ROLES.values() if r.team == Team.CITIZEN)
+    maf_cnt = sum(1 for r in ROLES.values() if r.team == Team.MAFIA)
+    maniac_cnt = sum(1 for r in ROLES.values() if r.team == Team.MANIAC)
+    vamp_cnt = sum(1 for r in ROLES.values() if r.team == Team.VAMPIRE)
+    neut_cnt = sum(1 for r in ROLES.values() if r.team == Team.NEUTRAL)
+    total_cnt = len(ROLES)
 
-    text += (
-        "💡 <b>Eslatma:</b> Botda zerikarli tinch aholi roli yo'q! "
-        "Har bir o'yinchi maxsus qobiliyatli va kuchli rolga ega bo'ladi."
+    if message.chat.type in ["group", "supergroup"]:
+        dm_kb = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="📖 Botda to'liq o'qish (Lichkada)", url=f"https://t.me/{bot_info.username}?start=roles")],
+            [InlineKeyboardButton(text=f"🏙 Shahar ({town_cnt})", callback_data="roles_cat_citizen"),
+             InlineKeyboardButton(text=f"🎩 Mafiya ({maf_cnt})", callback_data="roles_cat_mafia")],
+            [InlineKeyboardButton(text=f"🔪 Maniak ({maniac_cnt})", callback_data="roles_cat_maniac"),
+             InlineKeyboardButton(text=f"🧛 Vampir ({vamp_cnt})", callback_data="roles_cat_vampire")],
+            [InlineKeyboardButton(text=f"⚖️ Neytral ({neut_cnt})", callback_data="roles_cat_neutral")]
+        ])
+        await message.answer(
+            f"🎭 <b>MAFIA BOT — BARCHA ROLLLAR ENSIKLOPEDIYASI</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━━\n"
+            f"O'yinda jami <b>{total_cnt} ta maxsus qobiliyatli rol</b> mavjud!\n\n"
+            f"Tanishmoqchi bo'lgan jamoangizni tanlang:",
+            reply_markup=dm_kb,
+            parse_mode="HTML"
+        )
+        return
+
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=f"🏙 Shahar Kuchlari ({town_cnt} ta)", callback_data="roles_cat_citizen")],
+        [InlineKeyboardButton(text=f"🎩 Mafiya Sindikati ({maf_cnt} ta)", callback_data="roles_cat_mafia")],
+        [InlineKeyboardButton(text=f"🔪 Maniaklar va Yovuzlar ({maniac_cnt} ta)", callback_data="roles_cat_maniac")],
+        [InlineKeyboardButton(text=f"🧛 Vampirlar & Okkultizm ({vamp_cnt} ta)", callback_data="roles_cat_vampire")],
+        [InlineKeyboardButton(text=f"⚖️ Neytrallar & Mustaqil ({neut_cnt} ta)", callback_data="roles_cat_neutral")],
+    ])
+
+    await message.answer(
+        f"🎭 <b>MAFIA BOT — BARCHA ROLLLAR ENSIKLOPEDIYASI</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━━\n"
+        f"O'yinda jami <b>{total_cnt} ta maxsus qobiliyatli rol</b> mavjud!\n"
+        f"Botda zerikarli oddiy tinch aholi yo'q — har bir o'yinchining o'z maxfiy missiyasi va kuchi bor.\n\n"
+        f"Kerakli toifani tanlang:",
+        reply_markup=kb,
+        parse_mode="HTML"
     )
-    await message.answer(text, parse_mode="HTML")
+
+@router.callback_query(F.data.startswith("roles_cat_"))
+async def show_roles_category(call: CallbackQuery):
+    cat = call.data.replace("roles_cat_", "")
+    team_map = {
+        "citizen": (Team.CITIZEN, "🏙 SHAHAR KUCHLARI (CITIZEN)", "Shaharni yovuzlardan tozalovchi va himoyalovchi adolat kuchlari:"),
+        "mafia": (Team.MAFIA, "🎩 MAFIYA SINDIKATI (MAFIA)", "Don boshchiligidagi yashirin jinoiy to'da:"),
+        "maniac": (Team.MANIAC, "🔪 MANIAKLAR VA YOVUZLAR (MANIAC)", "Yakka o'zi barcha o'yinchilarga qarshi jang qiluvchi qotillar:"),
+        "vampire": (Team.VAMPIRE, "🧛 VAMPIRLAR VA OKKULTIZM (VAMPIRE)", "Zulmat maxluqlari va sehrli afsungarlar:"),
+        "neutral": (Team.NEUTRAL, "⚖️ NEYTRALLAR VA MUSTAQIL ROLLAR (NEUTRAL)", "O'zining mustaqil g'alaba maqsadiga ega qahramonlar:")
+    }
+    target_team, title, desc = team_map.get(cat, (Team.CITIZEN, "ROLLAR", ""))
+    cat_roles = [r for r in ROLES.values() if r.team == target_team]
+
+    txt = f"📖 <b>{title} ({len(cat_roles)} ta rol)</b>\n"
+    txt += f"<i>{desc}</i>\n"
+    txt += "━━━━━━━━━━━━━━━━━━━━━\n\n"
+
+    for r in cat_roles:
+        txt += f"{r.emoji} <b>{r.name}</b>\n"
+        txt += f"   • {r.description}\n\n"
+
+    txt += "━━━━━━━━━━━━━━━━━━━━━\n"
+    txt += "💡 <i>Barcha rollar o'yinchilar soniga qarab tasodifiy taqsimlanadi.</i>"
+
+    back_kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="⬅️ Boshqa toifalar", callback_data="roles_main")]
+    ])
+    await call.message.edit_text(txt, reply_markup=back_kb, parse_mode="HTML")
+    await call.answer()
+
+@router.callback_query(F.data == "roles_main")
+async def show_roles_main_menu(call: CallbackQuery):
+    town_cnt = sum(1 for r in ROLES.values() if r.team == Team.CITIZEN)
+    maf_cnt = sum(1 for r in ROLES.values() if r.team == Team.MAFIA)
+    maniac_cnt = sum(1 for r in ROLES.values() if r.team == Team.MANIAC)
+    vamp_cnt = sum(1 for r in ROLES.values() if r.team == Team.VAMPIRE)
+    neut_cnt = sum(1 for r in ROLES.values() if r.team == Team.NEUTRAL)
+    total_cnt = len(ROLES)
+
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=f"🏙 Shahar Kuchlari ({town_cnt} ta)", callback_data="roles_cat_citizen")],
+        [InlineKeyboardButton(text=f"🎩 Mafiya Sindikati ({maf_cnt} ta)", callback_data="roles_cat_mafia")],
+        [InlineKeyboardButton(text=f"🔪 Maniaklar va Yovuzlar ({maniac_cnt} ta)", callback_data="roles_cat_maniac")],
+        [InlineKeyboardButton(text=f"🧛 Vampirlar & Okkultizm ({vamp_cnt} ta)", callback_data="roles_cat_vampire")],
+        [InlineKeyboardButton(text=f"⚖️ Neytrallar & Mustaqil ({neut_cnt} ta)", callback_data="roles_cat_neutral")],
+    ])
+
+    await call.message.edit_text(
+        f"🎭 <b>MAFIA BOT — BARCHA ROLLLAR ENSIKLOPEDIYASI</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━━\n"
+        f"O'yinda jami <b>{total_cnt} ta maxsus qobiliyatli rol</b> mavjud!\n"
+        f"Botda zerikarli oddiy tinch aholi yo'q — har bir o'yinchining o'z maxfiy missiyasi va kuchi bor.\n\n"
+        f"Kerakli toifani tanlang:",
+        reply_markup=kb,
+        parse_mode="HTML"
+    )
+    await call.answer()
 
 @router.message(Command("help", "commands", "komandalar", "buyruqlar"))
 async def show_all_commands(message: Message):
