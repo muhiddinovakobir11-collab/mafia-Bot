@@ -1,3 +1,4 @@
+import html
 import random
 import asyncio
 from aiogram import Router, F, Bot
@@ -868,7 +869,7 @@ async def process_marry_answer(call: CallbackQuery):
     else:
         ring_note = "💖 <i>Haqiqiy sevgi bebaho! Nikoh bepul rasmiylashtirildi!</i>"
 
-    await db.marry_users(proposer_id, target_id)
+    await db.marry_users(proposer_id, target_id, husband_id=proposer_id, wife_id=target_id)
 
     proposer = await db.get_user(proposer_id)
     p_name = proposer["full_name"] if proposer else "Kuyov"
@@ -893,6 +894,148 @@ async def handle_divorce(message: Message):
 
     await db.divorce_users(message.from_user.id)
     await message.answer("💔 <b>Nikoh bekor qilindi. Siz endi rasman ajrashdingiz.</b>")
+@router.message(Command("mypara", "para", "juftim", "oila", "erim", "xotinim"))
+@router.message(F.text.lower().in_(["mypara", "para", "juftim", "oila", "erim", "xotinim", "/mypara", "/para", "/juftim", "/oila"]))
+async def handle_my_para(message: Message):
+    target_user_id = message.from_user.id
+    target_user_name = message.from_user.full_name
+    is_checking_other = False
+
+    if message.reply_to_message and not message.reply_to_message.from_user.is_bot:
+        if message.reply_to_message.from_user.id != message.from_user.id:
+            target_user_id = message.reply_to_message.from_user.id
+            target_user_name = message.reply_to_message.from_user.full_name
+            is_checking_other = True
+
+    m = await db.get_marriage(target_user_id)
+    if not m or not m.get("spouse"):
+        if is_checking_other:
+            await message.reply(
+                f"💔 <b>{html.escape(target_user_name)}</b> hali oila qurmagan (bo'ydoq)!\n"
+                f"Turmush qurish uchun uning xabariga reply qilib: <code>/marry</code> deb yozing.",
+                parse_mode="HTML"
+            )
+        else:
+            await message.reply(
+                "💔 <b>Siz hali oila qurmaysiz (bo'ydoq)!</b>\n\n"
+                "💍 Sevgan insoningiz bilan oila qurish uchun uning xabariga reply qilib: <code>/marry</code> deb yozing "
+                "yoki do'kondan <b>💍 Oltin Nikoh Uzugi</b> xarid qiling!",
+                parse_mode="HTML"
+            )
+        return
+
+    spouse = m["spouse"]
+    spouse_id = spouse["id"]
+    safe_spouse_name = html.escape(spouse.get("full_name") or "Turmush o'rtog'i")
+    spouse_utag = f'<a href="tg://user?id={spouse_id}">{safe_spouse_name}</a>'
+    role_title = m.get("spouse_role_title", "juftingiz")
+
+    wedding_date = str(m.get("wedding_date", "Yaqinda"))[:10]
+    love_points = m.get("love_points", 0)
+
+    if is_checking_other:
+        header = f"💍 <b>{html.escape(target_user_name)}NING PARASI:</b>"
+        line = f"❤️ <b>Uning {role_title}:</b> {spouse_utag}"
+    else:
+        header = "💍 <b>SIZNING OILANGIZ VA PARANGIZ:</b>"
+        line = f"❤️ <b>Sizning {role_title}:</b> {spouse_utag}"
+
+    text_parts = [
+        header,
+        "━━━━━━━━━━━━━━━━━━━━━",
+        line,
+        f"🆔 <b>ID:</b> <code>{spouse_id}</code>",
+        f"📅 <b>Nikoh sanasi:</b> <code>{wedding_date}</code>",
+        f"💖 <b>Muhabbat balli:</b> <b>{love_points} ❤️</b>",
+        "━━━━━━━━━━━━━━━━━━━━━",
+        "✨ <i>Bir-biringizni e'zozlang va birgalikda o'yinlarda g'alaba qozoning!</i>"
+    ]
+    resp_text = "\n".join(text_parts)
+
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="🔄 Er / Xotin deb almashtirish", callback_data=f"swap_roles_{target_user_id}"),
+            InlineKeyboardButton(text="🎁 Mashina sovg'a qilish", callback_data=f"para_givecar_{spouse_id}")
+        ]
+    ])
+
+    await message.reply(resp_text, parse_mode="HTML", reply_markup=kb)
+
+@router.callback_query(F.data.startswith("swap_roles_"))
+async def process_swap_roles(call: CallbackQuery):
+    target_user_id = int(call.data.replace("swap_roles_", ""))
+    m = await db.get_marriage(target_user_id)
+    if not m or not m.get("spouse"):
+        await call.answer("❌ Nikoh ma'lumoti topilmadi!", show_alert=True)
+        return
+
+    spouse_id = m["spouse"]["id"]
+    if call.from_user.id != target_user_id and call.from_user.id != spouse_id:
+        await call.answer("⚠️ Bu tugmani faqat er yoki xotin bosa oladi!", show_alert=True)
+        return
+
+    updated_m = await db.swap_marriage_roles(target_user_id)
+    if not updated_m:
+        await call.answer("❌ Xatolik yuz berdi!", show_alert=True)
+        return
+
+    spouse = updated_m["spouse"]
+    safe_spouse_name = html.escape(spouse.get("full_name") or "Turmush o'rtog'i")
+    spouse_utag = f'<a href="tg://user?id={spouse["id"]}">{safe_spouse_name}</a>'
+    role_title = updated_m.get("spouse_role_title", "juftingiz")
+    wedding_date = str(updated_m.get("wedding_date", "Yaqinda"))[:10]
+    love_points = updated_m.get("love_points", 0)
+
+    header = "💍 <b>SIZNING OILANGIZ VA PARANGIZ:</b>"
+    line = f"❤️ <b>Sizning {role_title}:</b> {spouse_utag}"
+
+    text_parts = [
+        header,
+        "━━━━━━━━━━━━━━━━━━━━━",
+        line,
+        f"🆔 <b>ID:</b> <code>{spouse['id']}</code>",
+        f"📅 <b>Nikoh sanasi:</b> <code>{wedding_date}</code>",
+        f"💖 <b>Muhabbat balli:</b> <b>{love_points} ❤️</b>",
+        "━━━━━━━━━━━━━━━━━━━━━",
+        f"✨ <i>Maqom almashtirildi! Endi sizning {role_title}: {spouse_utag}</i>"
+    ]
+    resp_text = "\n".join(text_parts)
+
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="🔄 Er / Xotin deb almashtirish", callback_data=f"swap_roles_{target_user_id}"),
+            InlineKeyboardButton(text="🎁 Mashina sovg'a qilish", callback_data=f"para_givecar_{spouse['id']}")
+        ]
+    ])
+
+    await call.message.edit_text(resp_text, parse_mode="HTML", reply_markup=kb)
+    await call.answer("✅ Maqom almashtirildi!", show_alert=False)
+
+@router.callback_query(F.data.startswith("para_givecar_"))
+async def process_para_givecar(call: CallbackQuery):
+    spouse_id = int(call.data.replace("para_givecar_", ""))
+    inv = await db.get_inventory(call.from_user.id)
+    cars = [it for it in inv if it["code"].startswith("mashina_") and it["quantity"] > 0]
+    if not cars:
+        await call.answer("❌ Sizda sovg'a qilish uchun mashina yo'q! Avval do'kondan mashina oling.", show_alert=True)
+        return
+
+    buttons = []
+    for it in cars:
+        buttons.append([
+            InlineKeyboardButton(
+                text=f"{it['name']} ({it['quantity']} ta)",
+                callback_data=f"givecar_{spouse_id}_{it['code']}"
+            )
+        ])
+    kb = InlineKeyboardMarkup(inline_keyboard=buttons)
+    await call.message.answer(
+        "🚗 <b>Parangizga qaysi mashinangizni sovg'a qilmoqchisiz?</b>\nTanlang:",
+        reply_markup=kb,
+        parse_mode="HTML"
+    )
+    await call.answer()
+
 
 # ==============================================================================
 # 14. CHO'NTAKKESARLIK / TALONCHILIK (/rob)
@@ -1004,7 +1147,17 @@ async def handle_reputation(message: Message):
 # 16. GARAJ VA MAFIA MASHINALARI (/garage, /givecar)
 # ==============================================================================
 CAR_DEFINITIONS = [
+    ("mashina_batmobile", "🦇 Batmobile Tumbler ('Zulmat Tanki')", "75% suiqasddan qochish"),
+    ("mashina_koenigsegg", "🌪️ Koenigsegg Jesko ('Giper-raketa')", "68% suiqasddan qochish"),
+    ("mashina_bugatti", "⚡ Bugatti Chiron Super Sport ('Tezlik Qiroli')", "65% suiqasddan qochish"),
+    ("mashina_maybach", "💎 Mercedes-Maybach S680 ('Imperator Limuzini')", "62% suiqasddan qochish"),
+    ("mashina_aston", "🍸 Aston Martin DBS ('Agent 007')", "58% suiqasddan qochish"),
+    ("mashina_mclaren", "🚀 McLaren 720S Spider", "55% suiqasddan qochish"),
+    ("mashina_lambo", "🐂 Lamborghini Aventador SVJ ('Yovvoyi Buqa')", "52% suiqasddan qochish"),
     ("mashina_rolls", "👑 Rolls-Royce Phantom ('Don Karleone')", "50% suiqasddan qochish"),
+    ("mashina_ferrari", "🐎 Ferrari SF90 Stradale", "48% suiqasddan qochish"),
+    ("mashina_cybertruck", "🛡️ Tesla Cybertruck ('Zirhli Kibertank')", "45% suiqasddan qochish"),
+    ("mashina_tesla", "⚡ Tesla Model S Plaid", "42% suiqasddan qochish"),
     ("mashina_porsche", "🏎️ Porsche 911 Turbo S", "40% suiqasddan qochish"),
     ("mashina_gelik", "🚙 Mercedes-Benz G63 ('Gelik')", "35% suiqasddan qochish"),
     ("mashina_bmw", "🏎️ BMW M5 F90", "30% suiqasddan qochish"),

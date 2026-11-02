@@ -1,3 +1,4 @@
+import html
 import time
 import random
 from aiogram import Router, F
@@ -252,7 +253,9 @@ async def build_full_profile_card(user: dict) -> str:
     spouse_str = "Bo'ydoq"
     marriage = await db.get_marriage(user_id)
     if marriage and marriage.get("spouse"):
-        spouse_str = f"💍 {marriage['spouse']['full_name']}"
+        sp = marriage["spouse"]
+        role_label = marriage.get("spouse_role_title", "parasi")
+        spouse_str = f'💍 <a href="tg://user?id={sp["id"]}">{html.escape(sp.get("full_name", "Turmush o\'rtog\'i"))}</a> ({role_label})' 
 
     vip_str = "Yo'q"
     if user.get("vip_until", 0) > time.time():
@@ -318,7 +321,12 @@ async def show_profile(message: Message):
         return
 
     marriage = await db.get_marriage(user["id"])
-    spouse_str = f"💍 {marriage['spouse']['full_name']}" if (marriage and marriage.get("spouse")) else "Bo'ydoq"
+    if marriage and marriage.get("spouse"):
+        sp = marriage["spouse"]
+        role_label = marriage.get("spouse_role_title", "parasi")
+        spouse_str = f'💍 <a href="tg://user?id={sp["id"]}">{html.escape(sp.get("full_name", "Parasi"))}</a> ({role_label})'
+    else:
+        spouse_str = "Bo'ydoq"
 
     if message.chat.type in ["group", "supergroup"]:
         bot_info = await message.bot.get_me()

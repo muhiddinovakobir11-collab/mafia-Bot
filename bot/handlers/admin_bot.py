@@ -626,7 +626,17 @@ ADMIN_CARS = [
     ("mashina_bmw", "🏎️ BMW M5 F90", "30%"),
     ("mashina_gelik", "🚙 Mercedes G63 Gelik", "35%"),
     ("mashina_porsche", "🏎️ Porsche 911 Turbo S", "40%"),
+    ("mashina_tesla", "⚡ Tesla Model S Plaid", "42%"),
+    ("mashina_cybertruck", "🛡️ Tesla Cybertruck", "45%"),
+    ("mashina_ferrari", "🐎 Ferrari SF90", "48%"),
     ("mashina_rolls", "👑 Rolls-Royce Phantom", "50%"),
+    ("mashina_lambo", "🐂 Lamborghini Aventador", "52%"),
+    ("mashina_mclaren", "🚀 McLaren 720S", "55%"),
+    ("mashina_aston", "🍸 Aston Martin DBS", "58%"),
+    ("mashina_maybach", "💎 Maybach S680", "62%"),
+    ("mashina_bugatti", "⚡ Bugatti Chiron", "65%"),
+    ("mashina_koenigsegg", "🌪️ Koenigsegg Jesko", "68%"),
+    ("mashina_batmobile", "🦇 Batmobile Tumbler", "75%"),
 ]
 
 def get_cars_selection_keyboard(target_id: int) -> InlineKeyboardMarkup:

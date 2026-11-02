@@ -31,6 +31,16 @@ DEFAULT_ITEMS = [
     ("mashina_gelik", "🚙 Mercedes-Benz G63 ('Gelik / G-Wagen')", "🚙", "Zirhlangan mafiya jipi. Tungi suiqasddan 35% qochish imkoniyati.", 50000, 100, 1),
     ("mashina_porsche", "🏎️ Porsche 911 Turbo S", "🏎️", "Gipertezlikdagi sportkar. Tungi suiqasddan 40% qochish imkoniyati.", 80000, 150, 1),
     ("mashina_rolls", "👑 Rolls-Royce Phantom ('Don Karleone')", "👑", "Eng hashamatli mafioz limuzini. Tungi suiqasddan 50% qochish imkoniyati!", 150000, 300, 1),
+    ("mashina_tesla", "⚡ Tesla Model S Plaid", "⚡", "Elektr giper-sedan. Tungi suiqasddan 42% qochish imkoniyati.", 90000, 180, 1),
+    ("mashina_cybertruck", "🛡️ Tesla Cybertruck ('Zirhli Kibertank')", "🛡️", "O'q o'tmas po'lat kuzovli kibertank. Tungi suiqasddan 45% qochish imkoniyati.", 110000, 220, 1),
+    ("mashina_ferrari", "🐎 Ferrari SF90 Stradale", "🐎", "Italiya poyga afsonasi. Tungi suiqasddan 48% qochish imkoniyati.", 130000, 260, 1),
+    ("mashina_lambo", "🐂 Lamborghini Aventador SVJ ('Yovvoyi Buqa')", "🐂", "Yovvoyi buqa qudrati. Tungi suiqasddan 52% qochish imkoniyati.", 160000, 320, 1),
+    ("mashina_mclaren", "🚀 McLaren 720S Spider", "🚀", "Aerodinamik giperkar. Tungi suiqasddan 55% qochish imkoniyati.", 180000, 360, 1),
+    ("mashina_aston", "🍸 Aston Martin DBS Superleggera ('Agent 007')", "🍸", "Agent 007 maxfiy superkari. Tungi suiqasddan 58% qochish imkoniyati.", 200000, 400, 1),
+    ("mashina_maybach", "💎 Mercedes-Maybach S680 ('Imperator Limuzini')", "💎", "Prezident va magnatlar hashamati. Tungi suiqasddan 62% qochish imkoniyati.", 230000, 450, 1),
+    ("mashina_bugatti", "⚡ Bugatti Chiron Super Sport ('Tezlik Qiroli')", "⚡", "Yer yuzidagi eng tezkor mashinalardan biri. Tungi suiqasddan 65% qochish imkoniyati.", 260000, 500, 1),
+    ("mashina_koenigsegg", "🌪️ Koenigsegg Jesko Absolut ('Tovushdan Tez')", "🌪️", "Shvetsiya giper-raketasi. Tungi suiqasddan 68% qochish imkoniyati.", 300000, 600, 1),
+    ("mashina_batmobile", "🦇 Batmobile Tumbler ('Zulmat Qasoskori')", "🦇", "Zulmat qasoskori zirhli tanki. Tungi suiqasddan 75% qochish imkoniyati!", 400000, 800, 1),
     ("signalizatsiya", "🚨 O'g'rilikdan signalizatsiya", "🚨", "Cho'ntakkesarlardan 100% himoya (1 martalik).", 2000, 4, 1),
 ]
 
@@ -114,10 +124,21 @@ class Database:
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user1_id INTEGER UNIQUE,
                 user2_id INTEGER UNIQUE,
+                husband_id INTEGER DEFAULT 0,
+                wife_id INTEGER DEFAULT 0,
                 wedding_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 love_points INTEGER DEFAULT 0
             );
             """)
+
+            for col, col_type in [
+                ("husband_id", "INTEGER DEFAULT 0"),
+                ("wife_id", "INTEGER DEFAULT 0"),
+            ]:
+                try:
+                    await db.execute(f"ALTER TABLE marriages ADD COLUMN {col} {col_type};")
+                except Exception:
+                    pass
 
             # Group Settings
             await db.execute("""
@@ -357,8 +378,15 @@ class Database:
             # Seed default items
             for item in DEFAULT_ITEMS:
                 await db.execute("""
-                    INSERT OR IGNORE INTO items (code, name, icon, description, price_pul, price_almaz, is_active)
-                    VALUES (?, ?, ?, ?, ?, ?, ?);
+                    INSERT INTO items (code, name, icon, description, price_pul, price_almaz, is_active)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(code) DO UPDATE SET
+                        name=excluded.name,
+                        icon=excluded.icon,
+                        description=excluded.description,
+                        price_pul=excluded.price_pul,
+                        price_almaz=excluded.price_almaz,
+                        is_active=excluded.is_active;
                 """, item)
 
             # Seed default achievements
@@ -1331,20 +1359,51 @@ class Database:
                 spouse_id = m["user2_id"] if m["user1_id"] == user_id else m["user1_id"]
                 spouse = await self.get_user(spouse_id)
                 m["spouse"] = spouse or {"id": spouse_id, "full_name": "Turmush o'rtog'i"}
+
+                husband_id = m.get("husband_id") or m["user1_id"]
+                wife_id = m.get("wife_id") or m["user2_id"]
+                if user_id == husband_id:
+                    m["my_role"] = "er"
+                    m["spouse_role"] = "xotin"
+                    m["spouse_role_title"] = "xotiningiz"
+                else:
+                    m["my_role"] = "xotin"
+                    m["spouse_role"] = "er"
+                    m["spouse_role_title"] = "eringiz"
                 return m
 
-    async def marry_users(self, user1_id: int, user2_id: int) -> bool:
+    async def marry_users(self, user1_id: int, user2_id: int, husband_id: int = 0, wife_id: int = 0) -> bool:
         await self.get_or_create_user(user1_id)
         await self.get_or_create_user(user2_id)
+        if not husband_id:
+            husband_id = user1_id
+        if not wife_id:
+            wife_id = user2_id
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute("DELETE FROM marriages WHERE user1_id IN (?, ?) OR user2_id IN (?, ?);", (user1_id, user2_id, user1_id, user2_id))
             await db.execute("""
-                INSERT INTO marriages (user1_id, user2_id) VALUES (?, ?);
-            """, (user1_id, user2_id))
+                INSERT INTO marriages (user1_id, user2_id, husband_id, wife_id) VALUES (?, ?, ?, ?);
+            """, (user1_id, user2_id, husband_id, wife_id))
             await db.execute("UPDATE users SET spouse_id = ? WHERE id = ?;", (user2_id, user1_id))
             await db.execute("UPDATE users SET spouse_id = ? WHERE id = ?;", (user1_id, user2_id))
             await db.commit()
             return True
+
+    async def swap_marriage_roles(self, user_id: int) -> Optional[Dict[str, Any]]:
+        m = await self.get_marriage(user_id)
+        if not m:
+            return None
+        cur_h = m.get("husband_id") or m["user1_id"]
+        cur_w = m.get("wife_id") or m["user2_id"]
+        new_h, new_w = cur_w, cur_h
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute("""
+                UPDATE marriages 
+                SET husband_id = ?, wife_id = ? 
+                WHERE id = ?;
+            """, (new_h, new_w, m["id"]))
+            await db.commit()
+        return await self.get_marriage(user_id)
 
     async def divorce_users(self, user_id: int) -> bool:
         async with aiosqlite.connect(self.db_path) as db:

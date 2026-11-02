@@ -56,7 +56,10 @@ def get_shop_menu_keyboard() -> InlineKeyboardMarkup:
             InlineKeyboardButton(text="🔵 💎 Almazga sotib olish", callback_data="shop_view_almaz")
         ],
         [
-            InlineKeyboardButton(text="🟢 🔄 Almazni Pulga almashtirish", callback_data="shop_exchange"),
+            InlineKeyboardButton(text="🚗 🚘 Avtosalon (Mashinalar)", callback_data="shop_view_cars"),
+            InlineKeyboardButton(text="🟢 🔄 Valyuta birjasi", callback_data="shop_exchange")
+        ],
+        [
             InlineKeyboardButton(text="🟣 🎒 Mening inventarim", callback_data="my_inventory")
         ]
     ])

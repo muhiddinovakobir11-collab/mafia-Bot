@@ -99,7 +99,17 @@ async def admin_dashboard(request: Request, q: str = ""):
         {"code": "mashina_bmw", "name": "BMW M5 F90"},
         {"code": "mashina_gelik", "name": "Mercedes-Benz G63 ('Gelik')"},
         {"code": "mashina_porsche", "name": "Porsche 911 Turbo S"},
+        {"code": "mashina_tesla", "name": "Tesla Model S Plaid"},
+        {"code": "mashina_cybertruck", "name": "Tesla Cybertruck ('Zirhli Kibertank')"},
+        {"code": "mashina_ferrari", "name": "Ferrari SF90 Stradale"},
         {"code": "mashina_rolls", "name": "Rolls-Royce Phantom ('Don Karleone')"},
+        {"code": "mashina_lambo", "name": "Lamborghini Aventador SVJ ('Yovvoyi Buqa')"},
+        {"code": "mashina_mclaren", "name": "McLaren 720S Spider"},
+        {"code": "mashina_aston", "name": "Aston Martin DBS Superleggera ('Agent 007')"},
+        {"code": "mashina_maybach", "name": "Mercedes-Maybach S680 ('Imperator Limuzini')"},
+        {"code": "mashina_bugatti", "name": "Bugatti Chiron Super Sport ('Tezlik Qiroli')"},
+        {"code": "mashina_koenigsegg", "name": "Koenigsegg Jesko Absolut ('Tovushdan Tez')"},
+        {"code": "mashina_batmobile", "name": "Batmobile Tumbler ('Zulmat Qasoskori')"},
     ]
 
     return templates.TemplateResponse(request=request, name="index.html", context={

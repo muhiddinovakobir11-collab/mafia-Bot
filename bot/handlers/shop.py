@@ -216,6 +216,42 @@ async def handle_buy_item_almaz(call: CallbackQuery):
     await call.answer(f"✅ {item['name']} muvaffaqiyatli xarid qilindi!", show_alert=True)
     await call.message.answer(receipt_text, parse_mode="HTML")
 
+
+@router.callback_query(F.data == "shop_view_cars")
+async def view_shop_cars(call: CallbackQuery):
+    items = await db.get_items(only_active=True)
+    cars = [it for it in items if it["code"].startswith("mashina_")]
+
+    buttons = []
+    for it in cars:
+        buttons.append([
+            InlineKeyboardButton(text=f"💰 {it['name']} ({it['price_pul']:,})", callback_data=f"buy_item_pul_{it['code']}"),
+            InlineKeyboardButton(text=f"💎 {it['price_almaz']} Almaz", callback_data=f"buy_item_almaz_{it['code']}")
+        ])
+
+    buttons.append([InlineKeyboardButton(text="🔙 Do'konga qaytish", callback_data="open_shop")])
+    kb = InlineKeyboardMarkup(inline_keyboard=buttons)
+    text = (
+        "🚗 <b>MAFIA AVTOSALONI — ENG ZO'R MASHINALAR:</b>\n\n"
+        "Mashinalar tunda sizga suiqasd qilinganda <b>qochib qolish</b> imkoniyatini beradi!\n\n"
+        "<i>Quyidagi ro'yxatdan o'zingizga ma'qul mashinani 💰 <b>Pul</b> yoki 💎 <b>Almaz</b>ga xarid qiling:</i>"
+    )
+
+    if call.message.chat.type in ["group", "supergroup"]:
+        try:
+            await call.bot.send_message(call.from_user.id, text, parse_mode="HTML", reply_markup=kb)
+            await call.answer("🚗 Avtosalon shaxsiy lichkangizga yuborildi!", show_alert=False)
+        except Exception:
+            bot_info = await call.bot.get_me()
+            await call.answer(f"⚠️ Avval @{bot_info.username} ga kirib Start bosing!", show_alert=True)
+        return
+
+    try:
+        await call.message.edit_text(text, parse_mode="HTML", reply_markup=kb)
+    except Exception:
+        await call.message.answer(text, parse_mode="HTML", reply_markup=kb)
+    await call.answer()
+
 @router.callback_query(F.data == "shop_exchange")
 async def show_exchange_menu(call: CallbackQuery):
     rate_str = await db.get_setting("almaz_to_pul_rate", "500")

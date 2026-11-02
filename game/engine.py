@@ -518,7 +518,17 @@ class GameRoom:
 
             # Mashinalar orqali suiqasddan qochish ehtimoli
             car_rates = [
+                ("mashina_batmobile", 0.75, "🦇 Batmobile Tumbler"),
+                ("mashina_koenigsegg", 0.68, "🌪️ Koenigsegg Jesko"),
+                ("mashina_bugatti", 0.65, "⚡ Bugatti Chiron"),
+                ("mashina_maybach", 0.62, "💎 Mercedes-Maybach S680"),
+                ("mashina_aston", 0.58, "🍸 Aston Martin DBS"),
+                ("mashina_mclaren", 0.55, "🚀 McLaren 720S"),
+                ("mashina_lambo", 0.52, "🐂 Lamborghini Aventador"),
                 ("mashina_rolls", 0.50, "👑 Rolls-Royce Phantom"),
+                ("mashina_ferrari", 0.48, "🐎 Ferrari SF90"),
+                ("mashina_cybertruck", 0.45, "🛡️ Tesla Cybertruck"),
+                ("mashina_tesla", 0.42, "⚡ Tesla Model S Plaid"),
                 ("mashina_porsche", 0.40, "🏎️ Porsche 911"),
                 ("mashina_gelik", 0.35, "🚙 Mercedes Gelik"),
                 ("mashina_bmw", 0.30, "🏎️ BMW M5 F90"),
