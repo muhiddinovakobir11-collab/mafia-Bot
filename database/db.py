@@ -1,5 +1,6 @@
 import aiosqlite
 import time
+import random
 from typing import Optional, List, Dict, Any, Tuple
 from config import DB_PATH, ADMIN_IDS
 
@@ -42,6 +43,14 @@ DEFAULT_ITEMS = [
     ("mashina_koenigsegg", "🌪️ Koenigsegg Jesko Absolut ('Tovushdan Tez')", "🌪️", "Shvetsiya giper-raketasi. Tungi suiqasddan 68% qochish imkoniyati.", 300000, 600, 1),
     ("mashina_batmobile", "🦇 Batmobile Tumbler ('Zulmat Qasoskori')", "🦇", "Zulmat qasoskori zirhli tanki. Tungi suiqasddan 75% qochish imkoniyati!", 400000, 800, 1),
     ("signalizatsiya", "🚨 O'g'rilikdan signalizatsiya", "🚨", "Cho'ntakkesarlardan 100% himoya (1 martalik).", 2000, 4, 1),
+    ("adolat_tosh", "🔮 Adolat toshi", "🔮", "Kunduzgi sudda bitta nohaq ovozni bekor qiladi.", 3200, 7, 1),
+    ("tungi_kamera", "📹 Tungi kuzatuv kamerasi", "📹", "Tunda sizga kim tashrif buyurganini yozib oladi.", 4000, 9, 1),
+    ("detektor", "📡 Yolg'on detektori", "📡", "Tanlangan o'yinchining so'nggi gapi rost yoki yolg'onligini bildiradi.", 3500, 8, 1),
+    ("soxta_pasport", "🛂 Soxta pasport", "🛂", "Komissar yoki Sherif tekshirganda toza ko'rsatadi.", 2800, 6, 1),
+    ("energetik", "⚡ Energetik kokteyl", "⚡", "O'yinchiga navbatdagi tunda 2 ta harakat qilish huquqini beradi.", 4500, 10, 1),
+    ("guldasta", "💐 Hashamatli atirgullar", "💐", "Sevgan insoningizga sovg'a qiling (+100 Sevgi balli).", 5000, 10, 1),
+    ("shokolad", "🍫 Shveytsariya shokoladi", "🍫", "Juftingizning kayfiyatini ko'taruvchi sovg'a (+50 Sevgi balli).", 2500, 5, 1),
+    ("qasr", "🏰 Qirollik qasri", "🏰", "Juftligingiz uchun hashamatli qasr (+500 Sevgi balli va Oila toji).", 100000, 200, 1),
 ]
 
 DEFAULT_STAR_PACKAGES = [
@@ -70,6 +79,19 @@ DEFAULT_CARD_PACKAGES = [
     ("pul", 15000, 2000, 50000, "💰 17,000 Pul (+2,000 bonus)", 1),
     ("vip", 30, 0, 15000, "👑 VIP Status (30 kun)", 1),
 ]
+
+BATTLE_PASS_TIERS = {
+    1: {"xp_needed": 100, "free_reward": "💰 2,000 Pul", "gold_reward": "💎 10 Almaz + 🛡️ Qalqon", "free_type": "pul", "free_val": 2000, "gold_type": "combo", "gold_almaz": 10, "gold_item": "qalqon"},
+    2: {"xp_needed": 250, "free_reward": "💎 5 Almaz", "gold_reward": "💰 10,000 Pul + 🔍 Durbin", "free_type": "almaz", "free_val": 5, "gold_type": "combo", "gold_pul": 10000, "gold_item": "durbin"},
+    3: {"xp_needed": 450, "free_reward": "🛡️ Qalqon", "gold_reward": "💎 25 Almaz + 🎭 Niqob", "free_type": "item", "free_item": "qalqon", "gold_type": "combo", "gold_almaz": 25, "gold_item": "niqob"},
+    4: {"xp_needed": 700, "free_reward": "💰 5,000 Pul", "gold_reward": "👑 3 kunlik VIP Status", "free_type": "pul", "free_val": 5000, "gold_type": "vip", "gold_vip_days": 3},
+    5: {"xp_needed": 1000, "free_reward": "💎 15 Almaz", "gold_reward": "🚗 Daewoo Matiz ('Tezkor')", "free_type": "almaz", "free_val": 15, "gold_type": "item", "gold_item": "mashina_matiz"},
+    6: {"xp_needed": 1350, "free_reward": "⚡ Adrenalin", "gold_reward": "💎 50 Almaz + 💰 25,000 Pul", "free_type": "item", "free_item": "adrenalin", "gold_type": "combo", "gold_almaz": 50, "gold_pul": 25000},
+    7: {"xp_needed": 1750, "free_reward": "💰 12,000 Pul", "gold_reward": "🚙 Chevrolet Gentra ('Qora Gentra')", "free_type": "pul", "free_val": 12000, "gold_type": "item", "gold_item": "mashina_gentra"},
+    8: {"xp_needed": 2200, "free_reward": "💎 25 Almaz", "gold_reward": "👑 7 kunlik VIP Status + 💎 50 Almaz", "free_type": "almaz", "free_val": 25, "gold_type": "vip_combo", "gold_vip_days": 7, "gold_almaz": 50},
+    9: {"xp_needed": 2700, "free_reward": "🔫 Miltiq (Vintovka)", "gold_reward": "🏎️ BMW M5 F90 Supercar", "free_type": "item", "free_item": "miltiq", "gold_type": "item", "gold_item": "mashina_bmw"},
+    10: {"xp_needed": 3300, "free_reward": "💎 50 Almaz + 💰 30,000 Pul", "gold_reward": "🚙 Mercedes G63 Gelik + 👑 15 kun VIP!", "free_type": "combo", "free_almaz": 50, "free_pul": 30000, "gold_type": "season_boss", "gold_item": "mashina_gelik", "gold_vip_days": 15}
+}
 
 class Database:
     def __init__(self, db_path=DB_PATH):
@@ -161,6 +183,19 @@ class Database:
                 to_user_id INTEGER,
                 change INTEGER,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            """)
+
+            # Battle Pass
+            await db.execute("""
+            CREATE TABLE IF NOT EXISTS battle_pass (
+                user_id INTEGER PRIMARY KEY,
+                season INTEGER DEFAULT 1,
+                tier INTEGER DEFAULT 1,
+                pass_xp INTEGER DEFAULT 0,
+                has_gold_pass INTEGER DEFAULT 0,
+                claimed_free_tiers TEXT DEFAULT '',
+                claimed_gold_tiers TEXT DEFAULT ''
             );
             """)
 
@@ -675,6 +710,9 @@ class Database:
             """, (user_id, item_code, quantity, quantity))
             await db.commit()
             return True
+
+    async def add_to_inventory(self, user_id: int, item_code: str, quantity: int = 1) -> bool:
+        return await self.add_inventory_item(user_id, item_code, quantity)
 
     async def consume_inventory_item(self, user_id: int, item_code: str, quantity: int = 1) -> bool:
         async with aiosqlite.connect(self.db_path) as db:
@@ -1448,6 +1486,379 @@ class Database:
                 settings["disabled_roles"]
             ))
             await db.commit()
+
+    # ==================== BATTLE PASS ====================
+    async def get_or_create_battle_pass(self, user_id: int) -> Dict[str, Any]:
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute("SELECT * FROM battle_pass WHERE user_id = ?;", (user_id,)) as cur:
+                row = await cur.fetchone()
+                if row:
+                    return dict(row)
+            
+            await db.execute("""
+                INSERT OR IGNORE INTO battle_pass (user_id, season, tier, pass_xp, has_gold_pass, claimed_free_tiers, claimed_gold_tiers)
+                VALUES (?, 1, 1, 0, 0, '', '');
+            """, (user_id,))
+            await db.commit()
+            return {
+                "user_id": user_id,
+                "season": 1,
+                "tier": 1,
+                "pass_xp": 0,
+                "has_gold_pass": 0,
+                "claimed_free_tiers": "",
+                "claimed_gold_tiers": ""
+            }
+
+    async def add_battle_pass_xp(self, user_id: int, xp_amount: int) -> Dict[str, Any]:
+        bp = await self.get_or_create_battle_pass(user_id)
+        current_xp = bp["pass_xp"] + xp_amount
+        current_tier = bp["tier"]
+
+        leveled_up = False
+        while current_tier < 10 and current_xp >= BATTLE_PASS_TIERS.get(current_tier, {}).get("xp_needed", 999999):
+            current_tier += 1
+            leveled_up = True
+
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute("""
+                UPDATE battle_pass SET pass_xp = ?, tier = ? WHERE user_id = ?;
+            """, (current_xp, current_tier, user_id))
+            await db.commit()
+
+        return {
+            "leveled_up": leveled_up,
+            "new_tier": current_tier,
+            "current_xp": current_xp
+        }
+
+    async def upgrade_battle_pass_gold(self, user_id: int) -> Dict[str, Any]:
+        bp = await self.get_or_create_battle_pass(user_id)
+        if bp["has_gold_pass"]:
+            return {"success": False, "error": "Sizda allaqachon Gold Pass mavjud!"}
+
+        user = await self.get_user(user_id)
+        if not user or user.get("almaz", 0) < 100:
+            return {"success": False, "error": "Gold Pass sotib olish uchun kamida 💎 100 Almaz kerak!"}
+
+        await self.update_balance(user_id, almaz_diff=-100)
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute("UPDATE battle_pass SET has_gold_pass = 1 WHERE user_id = ?;", (user_id,))
+            await db.commit()
+
+        return {"success": True}
+
+    async def claim_battle_pass_tier(self, user_id: int, tier: int, is_gold: bool = False) -> Dict[str, Any]:
+        if tier not in BATTLE_PASS_TIERS:
+            return {"success": False, "error": "Bunday bosqich mavjud emas!"}
+
+        bp = await self.get_or_create_battle_pass(user_id)
+        if bp["tier"] < tier:
+            return {"success": False, "error": f"Siz hali {tier}-bosqichga yetmadingiz!"}
+
+        cfg = BATTLE_PASS_TIERS[tier]
+
+        if is_gold:
+            if not bp["has_gold_pass"]:
+                return {"success": False, "error": "Gold Pass faollashtirilmagan!"}
+            claimed = set(bp["claimed_gold_tiers"].split(",")) if bp["claimed_gold_tiers"] else set()
+            if str(tier) in claimed:
+                return {"success": False, "error": f"{tier}-bosqich Gold mukofoti allaqachon olingan!"}
+            
+            claimed.add(str(tier))
+            new_claimed_str = ",".join(sorted(claimed, key=lambda x: int(x) if x.isdigit() else 0))
+
+            g_type = cfg.get("gold_type")
+            msg = cfg["gold_reward"]
+            if g_type == "combo":
+                if "gold_almaz" in cfg:
+                    await self.update_balance(user_id, almaz_diff=cfg["gold_almaz"])
+                if "gold_pul" in cfg:
+                    await self.update_balance(user_id, pul_diff=cfg["gold_pul"])
+                if "gold_item" in cfg:
+                    await self.add_to_inventory(user_id, cfg["gold_item"], 1)
+            elif g_type == "item":
+                await self.add_to_inventory(user_id, cfg["gold_item"], 1)
+            elif g_type == "vip":
+                await self.buy_vip_days(user_id, cfg["gold_vip_days"], 0)
+            elif g_type == "vip_combo":
+                await self.buy_vip_days(user_id, cfg["gold_vip_days"], 0)
+                await self.update_balance(user_id, almaz_diff=cfg["gold_almaz"])
+            elif g_type == "season_boss":
+                await self.add_to_inventory(user_id, cfg["gold_item"], 1)
+                await self.buy_vip_days(user_id, cfg["gold_vip_days"], 0)
+
+            async with aiosqlite.connect(self.db_path) as db:
+                await db.execute("UPDATE battle_pass SET claimed_gold_tiers = ? WHERE user_id = ?;", (new_claimed_str, user_id))
+                await db.commit()
+            return {"success": True, "reward_msg": msg}
+        else:
+            claimed = set(bp["claimed_free_tiers"].split(",")) if bp["claimed_free_tiers"] else set()
+            if str(tier) in claimed:
+                return {"success": False, "error": f"{tier}-bosqich Bepul mukofoti allaqachon olingan!"}
+
+            claimed.add(str(tier))
+            new_claimed_str = ",".join(sorted(claimed, key=lambda x: int(x) if x.isdigit() else 0))
+
+            f_type = cfg.get("free_type")
+            msg = cfg["free_reward"]
+            if f_type == "pul":
+                await self.update_balance(user_id, pul_diff=cfg["free_val"])
+            elif f_type == "almaz":
+                await self.update_balance(user_id, almaz_diff=cfg["free_val"])
+            elif f_type == "item":
+                await self.add_to_inventory(user_id, cfg["free_item"], 1)
+            elif f_type == "combo":
+                await self.update_balance(user_id, almaz_diff=cfg["free_almaz"], pul_diff=cfg["free_pul"])
+
+            async with aiosqlite.connect(self.db_path) as db:
+                await db.execute("UPDATE battle_pass SET claimed_free_tiers = ? WHERE user_id = ?;", (new_claimed_str, user_id))
+                await db.commit()
+            return {"success": True, "reward_msg": msg}
+
+    # ==================== COIN FLIP ====================
+    async def play_coin_flip(self, user_id: int, choice: str, bet: int) -> Dict[str, Any]:
+        if bet < 100:
+            return {"success": False, "error": "Minimal garov: 💰 100 Pul"}
+        if bet > 100000:
+            return {"success": False, "error": "Maksimal garov: 💰 100,000 Pul"}
+
+        user = await self.get_user(user_id)
+        if not user or user.get("pul", 0) < bet:
+            return {"success": False, "error": "Mablag'ingiz yetarli emas!"}
+
+        choice = choice.lower().strip()
+        if choice not in ("burgut", "panja", "b", "p"):
+            return {"success": False, "error": "Iltimos, 'burgut' yoki 'panja' ni tanlang!"}
+
+        outcome = "burgut" if random.random() < 0.50 else "panja"
+        is_win = (choice in ("burgut", "b") and outcome == "burgut") or (choice in ("panja", "p") and outcome == "panja")
+
+        if is_win:
+            win_amount = bet
+            await self.update_balance(user_id, pul_diff=win_amount)
+            new_user = await self.get_user(user_id)
+            return {
+                "success": True,
+                "won": True,
+                "outcome": outcome,
+                "amount": win_amount,
+                "balance": new_user.get("pul", 0)
+            }
+        else:
+            await self.update_balance(user_id, pul_diff=-bet)
+            new_user = await self.get_user(user_id)
+            return {
+                "success": True,
+                "won": False,
+                "outcome": outcome,
+                "amount": bet,
+                "balance": new_user.get("pul", 0)
+            }
+
+    # ==================== MYSTERY CHESTS ====================
+    async def open_mystery_chest(self, user_id: int, chest_type: str) -> Dict[str, Any]:
+        chest_type = chest_type.lower()
+        prices = {
+            "bronze": {"cost_pul": 5000, "cost_almaz": 0},
+            "silver": {"cost_pul": 0, "cost_almaz": 10},
+            "gold": {"cost_pul": 0, "cost_almaz": 35}
+        }
+        if chest_type not in prices:
+            return {"success": False, "error": "Bunday sandiq turi mavjud emas! (bronze, silver, gold)"}
+
+        cfg = prices[chest_type]
+        user = await self.get_user(user_id)
+        if not user:
+            return {"success": False, "error": "Foydalanuvchi topilmadi!"}
+
+        if cfg["cost_pul"] > 0 and user.get("pul", 0) < cfg["cost_pul"]:
+            return {"success": False, "error": f"Sandiq narxi: 💰 {cfg['cost_pul']:,} Pul. Sizda mablag' yetarli emas!"}
+        if cfg["cost_almaz"] > 0 and user.get("almaz", 0) < cfg["cost_almaz"]:
+            return {"success": False, "error": f"Sandiq narxi: 💎 {cfg['cost_almaz']} Almaz. Sizda almaz yetarli emas!"}
+
+        await self.update_balance(user_id, pul_diff=-cfg["cost_pul"], almaz_diff=-cfg["cost_almaz"])
+
+        roll = random.random() * 100
+        reward_desc = ""
+
+        if chest_type == "bronze":
+            if roll < 50:
+                pul_win = random.randint(2000, 8000)
+                await self.update_balance(user_id, pul_diff=pul_win)
+                reward_desc = f"💰 {pul_win:,} Pul"
+            elif roll < 80:
+                almaz_win = random.randint(2, 6)
+                await self.update_balance(user_id, almaz_diff=almaz_win)
+                reward_desc = f"💎 {almaz_win} Almaz"
+            elif roll < 95:
+                await self.add_to_inventory(user_id, "qalqon", 1)
+                reward_desc = "🛡️ Qalqon (Bronjilet)"
+            else:
+                await self.add_to_inventory(user_id, "mashina_matiz", 1)
+                reward_desc = "🚗 Daewoo Matiz ('Tezkor')!"
+        elif chest_type == "silver":
+            if roll < 40:
+                pul_win = random.randint(15000, 35000)
+                await self.update_balance(user_id, pul_diff=pul_win)
+                reward_desc = f"💰 {pul_win:,} Pul"
+            elif roll < 70:
+                almaz_win = random.randint(12, 25)
+                await self.update_balance(user_id, almaz_diff=almaz_win)
+                reward_desc = f"💎 {almaz_win} Almaz"
+            elif roll < 90:
+                await self.add_to_inventory(user_id, "mashina_gentra", 1)
+                reward_desc = "🚙 Chevrolet Gentra ('Qora Gentra')"
+            else:
+                await self.buy_vip_days(user_id, 7, 0)
+                reward_desc = "👑 7 kunlik VIP Status!"
+        elif chest_type == "gold":
+            if roll < 30:
+                pul_win = random.randint(50000, 150000)
+                await self.update_balance(user_id, pul_diff=pul_win)
+                reward_desc = f"💰 {pul_win:,} Pul"
+            elif roll < 60:
+                almaz_win = random.randint(40, 80)
+                await self.update_balance(user_id, almaz_diff=almaz_win)
+                reward_desc = f"💎 {almaz_win} Almaz"
+            elif roll < 85:
+                await self.add_to_inventory(user_id, "mashina_bmw", 1)
+                reward_desc = "🏎️ BMW M5 F90 Supercar!"
+            elif roll < 97:
+                await self.add_to_inventory(user_id, "mashina_gelik", 1)
+                reward_desc = "🚙 Mercedes G63 Gelik!"
+            else:
+                await self.add_to_inventory(user_id, "mashina_rolls", 1)
+                reward_desc = "👑 Rolls-Royce Phantom ('Don Karleone')!"
+
+        return {"success": True, "reward_desc": reward_desc}
+
+    # ==================== LOVE & WEDDING GIFTS ====================
+    async def send_love_gift(self, user_id: int, gift_code: str) -> Dict[str, Any]:
+        marriage = await self.get_marriage(user_id)
+        if not marriage:
+            return {"success": False, "error": "Siz hali turmush qurmaysiz! Sovg'a yuborish uchun /marry qiling."}
+
+        gifts = {
+            "shokolad": {"name": "🍫 Shveytsariya shokoladi", "points": 50, "pul": 2500, "almaz": 0},
+            "guldasta": {"name": "💐 Hashamatli atirgullar", "points": 100, "pul": 5000, "almaz": 0},
+            "uzuk": {"name": "💍 Olmosli uzuk", "points": 250, "pul": 0, "almaz": 25},
+            "qasr": {"name": "🏰 Qirollik qasri", "points": 500, "pul": 100000, "almaz": 0}
+        }
+        if gift_code not in gifts:
+            return {"success": False, "error": "Bunday sovg'a mavjud emas! (shokolad, guldasta, uzuk, qasr)"}
+
+        cfg = gifts[gift_code]
+        user = await self.get_user(user_id)
+        if cfg["pul"] > 0 and user.get("pul", 0) < cfg["pul"]:
+            return {"success": False, "error": f"Mablag' yetarli emas! Sovg'a narxi: 💰 {cfg['pul']:,} Pul"}
+        if cfg["almaz"] > 0 and user.get("almaz", 0) < cfg["almaz"]:
+            return {"success": False, "error": f"Almaz yetarli emas! Sovg'a narxi: 💎 {cfg['almaz']} Almaz"}
+
+        await self.update_balance(user_id, pul_diff=-cfg["pul"], almaz_diff=-cfg["almaz"])
+        new_points = marriage.get("love_points", 0) + cfg["points"]
+
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute("UPDATE marriages SET love_points = ? WHERE id = ?;", (new_points, marriage["id"]))
+            await db.commit()
+
+        spouse = marriage.get("spouse", {})
+        return {
+            "success": True,
+            "gift_name": cfg["name"],
+            "points_added": cfg["points"],
+            "total_points": new_points,
+            "spouse_name": spouse.get("full_name", "Juftingiz"),
+            "spouse_id": spouse.get("id", 0)
+        }
+
+    # ==================== VIP & CUSTOM TITLE ====================
+    async def buy_vip_days(self, user_id: int, days: int, almaz_cost: int = 0) -> Dict[str, Any]:
+        user = await self.get_user(user_id)
+        if not user:
+            return {"success": False, "error": "Foydalanuvchi topilmadi!"}
+
+        if almaz_cost > 0:
+            if user.get("almaz", 0) < almaz_cost:
+                return {"success": False, "error": f"Sizda yetarli almaz yo'q! (Talab etiladi: 💎 {almaz_cost})"}
+            await self.update_balance(user_id, almaz_diff=-almaz_cost)
+
+        cur_vip = user.get("vip_until", 0)
+        now = int(time.time())
+        base_time = max(cur_vip, now)
+        new_vip = base_time + (days * 86400)
+
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute("UPDATE users SET vip_until = ? WHERE id = ?;", (new_vip, user_id))
+            await db.commit()
+
+        return {"success": True, "vip_until": new_vip, "days_added": days}
+
+    async def set_custom_title(self, user_id: int, title: str) -> Dict[str, Any]:
+        user = await self.get_user(user_id)
+        if not user:
+            return {"success": False, "error": "Foydalanuvchi topilmadi!"}
+
+        now = int(time.time())
+        if user.get("vip_until", 0) <= now and not user.get("is_admin", 0):
+            return {"success": False, "error": "Shaxsiy taxallus o'rnatish faqat 👑 VIP foydalanuvchilar va Adminlar uchun ochiq!"}
+
+        clean_title = title.strip()[:25]
+        if not clean_title:
+            return {"success": False, "error": "Taxallus matni bo'sh bo'lishi mumkin emas!"}
+
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute("UPDATE users SET custom_title = ? WHERE id = ?;", (clean_title, user_id))
+            await db.commit()
+
+        return {"success": True, "title": clean_title}
+
+    # ==================== EXTENDED USER STATS ====================
+    async def get_extended_user_stats(self, user_id: int) -> Dict[str, Any]:
+        user = await self.get_user(user_id)
+        if not user:
+            return {}
+
+        marriage = await self.get_marriage(user_id)
+        cars = await self.get_user_cars(user_id)
+        bp = await self.get_or_create_battle_pass(user_id)
+
+        now = int(time.time())
+        is_vip = user.get("vip_until", 0) > now
+        vip_days_left = max(0, int((user.get("vip_until", 0) - now) / 86400)) if is_vip else 0
+
+        played = user.get("games_played", 0)
+        won = user.get("games_won", 0)
+        winrate = round((won / played * 100), 1) if played > 0 else 0.0
+
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute("SELECT COUNT(*) as count FROM user_achievements WHERE user_id = ?;", (user_id,)) as cur:
+                ach_row = await cur.fetchone()
+                ach_count = ach_row["count"] if ach_row else 0
+
+            async with db.execute("""
+                SELECT c.name, cm.role 
+                FROM clan_members cm
+                JOIN clans c ON c.id = cm.clan_id
+                WHERE cm.user_id = ?;
+            """, (user_id,)) as cur:
+                clan_row = await cur.fetchone()
+                clan_info = dict(clan_row) if clan_row else None
+
+        return {
+            "user": user,
+            "marriage": marriage,
+            "cars_count": len(cars),
+            "cars": cars,
+            "battle_pass": bp,
+            "is_vip": is_vip,
+            "vip_days_left": vip_days_left,
+            "winrate": winrate,
+            "achievements_count": ach_count,
+            "clan": clan_info
+        }
 
 db = Database()
 

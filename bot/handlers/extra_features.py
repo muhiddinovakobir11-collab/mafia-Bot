@@ -14,7 +14,7 @@ from aiogram.types import (
 from aiogram.filters import Command
 
 from config import ADMIN_IDS
-from database.db import db
+from database.db import db, BATTLE_PASS_TIERS
 from game.engine import game_manager
 from game.roles import ROLES
 from bot.keyboards import get_casino_menu_keyboard
@@ -1468,4 +1468,389 @@ async def toggle_setting_callback(call: CallbackQuery):
 
     await call.message.edit_reply_markup(reply_markup=kb)
     await call.answer("✅ Sozlama yangilandi!")
+
+# ==============================================================================
+# 19. BATTLE PASS (1-MAVSUM)
+# ==============================================================================
+@router.message(Command("pass", "battlepass", "mavsum"))
+async def show_battle_pass(message: Message):
+    if message.chat.type != "private":
+        bot_info = await message.bot.get_me()
+        kb = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🎟️ Battle Passni ochish", url=f"https://t.me/{bot_info.username}?start=pass")]
+        ])
+        await message.answer(
+            f"🎟️ <b>{message.from_user.full_name}</b>, shaxsiy Battle Pass profilingizni bot lichkasida oching:",
+            reply_markup=kb,
+            parse_mode="HTML"
+        )
+        return
+
+    user_id = message.from_user.id
+    bp = await db.get_or_create_battle_pass(user_id)
+    cur_tier = bp["tier"]
+    cur_xp = bp["pass_xp"]
+    has_gold = bp["has_gold_pass"]
+    claimed_free = set(bp["claimed_free_tiers"].split(",")) if bp["claimed_free_tiers"] else set()
+    claimed_gold = set(bp["claimed_gold_tiers"].split(",")) if bp["claimed_gold_tiers"] else set()
+
+    next_req = BATTLE_PASS_TIERS.get(cur_tier, {}).get("xp_needed", 3300)
+    percent = min(100, int((cur_xp / next_req) * 100)) if next_req > 0 else 100
+    bars = int(percent / 10)
+    progress_bar = "🟩" * bars + "⬜" * (10 - bars)
+
+    gold_status = "👑 <b>GOLD PASS FAQLLASHTIRILGAN</b>" if has_gold else "🔒 <b>STANDART (Oddiy pass)</b>"
+
+    text = (
+        f"🎟️ <b>MAFIA BATTLE PASS — 1-MAVSUM</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━━\n"
+        f"👤 <b>Foydalanuvchi:</b> {html.escape(message.from_user.full_name)}\n"
+        f"🏆 <b>Joriy Bosqich:</b> {cur_tier} / 10-bosqich\n"
+        f"⚡ <b>Mavsum XP:</b> {cur_xp} / {next_req} XP\n"
+        f"📊 <b>Progress:</b> [{progress_bar}] {percent}%\n"
+        f"🎖️ <b>Status:</b> {gold_status}\n\n"
+        f"🎁 <b>BOSQICHLAR RO'YXATI VA SOVRINLAR:</b>\n"
+    )
+
+    for t in range(1, 11):
+        info = BATTLE_PASS_TIERS[t]
+        f_mark = "✅" if str(t) in claimed_free else ("🎁" if cur_tier >= t else "🔒")
+        g_mark = "✅" if str(t) in claimed_gold else ("⭐" if (cur_tier >= t and has_gold) else "🔒")
+        text += f"<b>{t}-bosqich ({info['xp_needed']} XP):</b>\n"
+        text += f"  • {f_mark} Bepul: {info['free_reward']}\n"
+        text += f"  • {g_mark} Gold: {info['gold_reward']}\n"
+
+    keyboard_buttons = []
+    # Claim buttons for unlocked tiers
+    claim_row = []
+    for t in range(1, cur_tier + 1):
+        if str(t) not in claimed_free:
+            claim_row.append(InlineKeyboardButton(text=f"🎁 {t}-bepul", callback_data=f"bp_claim_free_{t}"))
+            if len(claim_row) >= 2:
+                keyboard_buttons.append(claim_row)
+                claim_row = []
+    if claim_row:
+        keyboard_buttons.append(claim_row)
+
+    if has_gold:
+        claim_gold_row = []
+        for t in range(1, cur_tier + 1):
+            if str(t) not in claimed_gold:
+                claim_gold_row.append(InlineKeyboardButton(text=f"👑 {t}-Gold", callback_data=f"bp_claim_gold_{t}"))
+                if len(claim_gold_row) >= 2:
+                    keyboard_buttons.append(claim_gold_row)
+                    claim_gold_row = []
+        if claim_gold_row:
+            keyboard_buttons.append(claim_gold_row)
+    else:
+        keyboard_buttons.append([
+            InlineKeyboardButton(text="⭐ Gold Pass sotib olish (💎 100 Almaz)", callback_data="bp_upgrade_gold")
+        ])
+
+    kb = InlineKeyboardMarkup(inline_keyboard=keyboard_buttons) if keyboard_buttons else None
+    await message.answer(text, reply_markup=kb, parse_mode="HTML")
+
+@router.callback_query(F.data.startswith("bp_claim_free_"))
+async def process_claim_free(call: CallbackQuery):
+    tier = int(call.data.replace("bp_claim_free_", ""))
+    res = await db.claim_battle_pass_tier(call.from_user.id, tier, is_gold=False)
+    if not res["success"]:
+        await call.answer(f"❌ {res['error']}", show_alert=True)
+        return
+    await call.answer(f"🎉 Tabriklaymiz! Siz {tier}-bosqich Bepul mukofotini oldingiz:\n{res['reward_msg']}", show_alert=True)
+
+@router.callback_query(F.data.startswith("bp_claim_gold_"))
+async def process_claim_gold(call: CallbackQuery):
+    tier = int(call.data.replace("bp_claim_gold_", ""))
+    res = await db.claim_battle_pass_tier(call.from_user.id, tier, is_gold=True)
+    if not res["success"]:
+        await call.answer(f"❌ {res['error']}", show_alert=True)
+        return
+    await call.answer(f"👑 Ajoyib! Siz {tier}-bosqich GOLD mukofotini oldingiz:\n{res['reward_msg']}", show_alert=True)
+
+@router.callback_query(F.data == "bp_upgrade_gold")
+async def process_upgrade_gold(call: CallbackQuery):
+    res = await db.upgrade_battle_pass_gold(call.from_user.id)
+    if not res["success"]:
+        await call.answer(f"❌ {res['error']}", show_alert=True)
+        return
+    await call.answer("🌟 Tabriklaymiz! Siz muvaffaqiyatli GOLD PASS egasi bo'ldingiz!", show_alert=True)
+    await call.message.answer("👑 <b>Siz Mafia Gold Passni faollashtirdingiz!</b> Endi barcha bosqichdagi elita sovrinlarini olishingiz mumkin!")
+
+# ==============================================================================
+# 20. TANGA TASHLASH (COIN FLIP / TANGA)
+# ==============================================================================
+@router.message(Command("coin", "tanga"))
+async def cmd_coin_flip(message: Message):
+    args = message.text.split()
+    if len(args) < 3:
+        await message.answer(
+            "🪙 <b>TANGA TASHLASH (50/50 QIMOR)</b>\n\n"
+            "Foydalanish: <code>/coin burgut 5000</code> yoki <code>/coin panja 10000</code>\n"
+            "Tanlovlar: <code>burgut</code> yoki <code>panja</code>\n"
+            "Yutsangiz 2 barobar olasiz!",
+            parse_mode="HTML"
+        )
+        return
+
+    choice = args[1].lower()
+    try:
+        bet = int(args[2].replace(",", "").replace(".", "").replace("k", "000"))
+    except ValueError:
+        await message.answer("❌ Noto'g'ri summa kiritildi!")
+        return
+
+    res = await db.play_coin_flip(message.from_user.id, choice, bet)
+    if not res["success"]:
+        await message.answer(f"❌ {res['error']}")
+        return
+
+    outcome_icon = "🦅 Burgut" if res["outcome"] == "burgut" else "🐾 Panja"
+    if res["won"]:
+        await message.answer(
+            f"🪙 <b>Tanga havoga otildi va aylandi...</b>\n\n"
+            f"🎲 <b>Natija:</b> {outcome_icon} tushdi!\n"
+            f"🎉 <b>TABRIKLAYMIZ! Siz yutdingiz!</b>\n"
+            f"💰 <b>Yutuq:</b> +{res['amount']:,} Pul!\n"
+            f"💵 <b>Yangi balansingiz:</b> {res['balance']:,} Pul",
+            parse_mode="HTML"
+        )
+    else:
+        await message.answer(
+            f"🪙 <b>Tanga havoga otildi va aylandi...</b>\n\n"
+            f"🎲 <b>Natija:</b> {outcome_icon} tushdi!\n"
+            f"😔 <b>Afsuski, bu safar omadingiz kelmadi.</b>\n"
+            f"💸 <b>Yo'qotilgan summa:</b> -{res['amount']:,} Pul\n"
+            f"💵 <b>Qolgan balansingiz:</b> {res['balance']:,} Pul",
+            parse_mode="HTML"
+        )
+
+# ==============================================================================
+# 21. MYSTERY CHESTS (MAXFIY SANDIQLAR)
+# ==============================================================================
+@router.message(Command("chest", "sandiq"))
+async def cmd_mystery_chests(message: Message):
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🥉 Bronza Sandiq (💰 5,000 Pul)", callback_data="open_chest_bronze")],
+        [InlineKeyboardButton(text="🥈 Kumush Sandiq (💎 10 Almaz)", callback_data="open_chest_silver")],
+        [InlineKeyboardButton(text="🥇 Oltin Sandiq (💎 35 Almaz)", callback_data="open_chest_gold")]
+    ])
+    text = (
+        "📦 <b>MAXFIY MAFIYA SANDIQLARI</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━━\n"
+        "Sandiqlarni ochib, ichidan qimmatbaho avtomobillar, yirik summalar, olmoslar va VIP maqomlarini yutib oling!\n\n"
+        "🥉 <b>Bronza Sandiq (💰 5,000 Pul):</b>\n"
+        "  • 8,000 gacha Pul, 💎 6 gacha Almaz, 🛡️ Qalqon yoki 🚗 Matiz!\n\n"
+        "🥈 <b>Kumush Sandiq (💎 10 Almaz):</b>\n"
+        "  • 35,000 gacha Pul, 💎 25 Almaz, 🚙 Gentra yoki 👑 7 kun VIP!\n\n"
+        "🥇 <b>Oltin Sandiq (💎 35 Almaz):</b>\n"
+        "  • 150,000 gacha Pul, 💎 80 Almaz, 🏎️ BMW M5, 🚙 Gelik yoki 👑 Rolls-Royce!\n\n"
+        "<i>Quyidagi tugmalardan birini bosing va omadingizni sinang:</i>"
+    )
+    await message.answer(text, reply_markup=kb, parse_mode="HTML")
+
+@router.callback_query(F.data.startswith("open_chest_"))
+async def process_open_chest(call: CallbackQuery):
+    chest_type = call.data.replace("open_chest_", "")
+    res = await db.open_mystery_chest(call.from_user.id, chest_type)
+    if not res["success"]:
+        await call.answer(f"❌ {res['error']}", show_alert=True)
+        return
+
+    await call.message.answer(
+        f"✨ <b>SANDIQ OCHILDI!</b>\n\n"
+        f"👤 <b>Ochuvchi:</b> {call.from_user.full_name}\n"
+        f"🎁 <b>Sizning sovriningiz:</b> {res['reward_desc']}!\n\n"
+        f"<i>Omadingiz doim yor bo'lsin!</i>",
+        parse_mode="HTML"
+    )
+    await call.answer("🎉 Sandiq ochildi!")
+
+# ==============================================================================
+# 22. SEVGI VA JUFTLIK SOVG'ALARI
+# ==============================================================================
+@router.message(Command("giftlove", "juftlik", "sevgi"))
+async def cmd_gift_love(message: Message):
+    marriage = await db.get_marriage(message.from_user.id)
+    if not marriage:
+        await message.answer(
+            "💔 <b>Siz hali turmush qurmaysiz!</b>\n"
+            "Juftlik tizimidan foydalanish uchun biror o'yinchining xabariga reply qilib <code>/marry</code> buyrug'ini yozing.",
+            parse_mode="HTML"
+        )
+        return
+
+    spouse = marriage.get("spouse", {})
+    spouse_name = spouse.get("full_name", "Juftingiz")
+    points = marriage.get("love_points", 0)
+
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🍫 Shokolad (💰 2,500 Pul | +50 ❤️)", callback_data="sendgift_shokolad")],
+        [InlineKeyboardButton(text="💐 Hashamatli atirgullar (💰 5,000 Pul | +100 ❤️)", callback_data="sendgift_guldasta")],
+        [InlineKeyboardButton(text="💍 Olmosli uzuk (💎 25 Almaz | +250 ❤️)", callback_data="sendgift_uzuk")],
+        [InlineKeyboardButton(text="🏰 Qirollik qasri (💰 100,000 Pul | +500 ❤️)", callback_data="sendgift_qasr")]
+    ])
+
+    await message.answer(
+        f"💖 <b>SEVGI VA JUFTLIK MENYUSI</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━━\n"
+        f"💍 <b>Juftingiz:</b> {spouse_name}\n"
+        f"❤️ <b>Sevgi ballari:</b> {points} ball\n\n"
+        f"<i>Juftingizga sovg'a yuborib sevgi ballaringizni oshiring:</i>",
+        reply_markup=kb,
+        parse_mode="HTML"
+    )
+
+@router.callback_query(F.data.startswith("sendgift_"))
+async def process_send_gift(call: CallbackQuery):
+    gift_code = call.data.replace("sendgift_", "")
+    res = await db.send_love_gift(call.from_user.id, gift_code)
+    if not res["success"]:
+        await call.answer(f"❌ {res['error']}", show_alert=True)
+        return
+
+    await call.message.answer(
+        f"💖 <b>SOVG'A YUBORILDI!</b>\n\n"
+        f"👤 <b>Yuboruvchi:</b> {call.from_user.full_name}\n"
+        f"🎯 <b>Qabul qiluvchi:</b> {res['spouse_name']}\n"
+        f"🎁 <b>Sovg'a:</b> {res['gift_name']}\n"
+        f"📈 <b>Qo'shilgan sevgi:</b> +{res['points_added']} ❤️\n"
+        f"🌟 <b>Jami sevgi ballari:</b> {res['total_points']} ❤️",
+        parse_mode="HTML"
+    )
+    await call.answer("🎁 Sovg'a yuborildi!")
+
+# ==============================================================================
+# 23. VIP & SHAXSIY TAXALLUS (TITLE)
+# ==============================================================================
+@router.message(Command("vip", "premium"))
+async def cmd_vip_info(message: Message):
+    user = await db.get_user(message.from_user.id)
+    is_vip = user and user.get("vip_until", 0) > time.time()
+    days_left = max(0, int((user.get("vip_until", 0) - time.time()) / 86400)) if is_vip else 0
+
+    vip_str = f"✅ <b>Faol ({days_left} kun qoldi)</b>" if is_vip else "❌ <b>Faol emas</b>"
+
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="👑 VIP 7 kun (💎 25 Almaz)", callback_data="buyvip_7_25")],
+        [InlineKeyboardButton(text="👑 VIP 30 kun (💎 75 Almaz)", callback_data="buyvip_30_75")],
+        [InlineKeyboardButton(text="🏷️ Shaxsiy unvon o'rnatish (/settitle)", callback_data="vip_settitle_info")]
+    ])
+
+    text = (
+        f"👑 <b>MAFIA VIP MAQOMI VA IMTIYOZLARI</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━━\n"
+        f"🎖️ <b>Sizning holatingiz:</b> {vip_str}\n\n"
+        f"<b>VIP IMTIYOZLARI:</b>\n"
+        f"  • 👑 Ismingiz yonida oltin toj nishoni\n"
+        f"  • 🚀 Har bir o'yindan <b>1.5x ko'proq XP va Pul</b>\n"
+        f"  • 🏃‍♂️ Tungi suiqasdlardan <b>+10% qo'shimcha qochish imkoniyati</b>\n"
+        f"  • 🏷️ <code>/settitle</code> orqali o'zingizga shaxsiy taxallus o'rnatish huquqi\n"
+        f"  • 🎁 Har kuni qo'shimcha bepul Almazlar!\n"
+    )
+    await message.answer(text, reply_markup=kb, parse_mode="HTML")
+
+@router.callback_query(F.data.startswith("buyvip_"))
+async def process_buy_vip(call: CallbackQuery):
+    parts = call.data.split("_")
+    days = int(parts[1])
+    cost = int(parts[2])
+
+    res = await db.buy_vip_days(call.from_user.id, days, cost)
+    if not res["success"]:
+        await call.answer(f"❌ {res['error']}", show_alert=True)
+        return
+
+    await call.message.answer(
+        f"👑 <b>TABRIKLAYMIZ!</b>\n\n"
+        f"Sizga <b>{days} kunlik VIP maqomi</b> berildi! Endi siz o'yinda 1.5x daromad va boshqa barcha imtiyozlarga egasiz!",
+        parse_mode="HTML"
+    )
+    await call.answer("👑 VIP faollashtirildi!")
+
+@router.callback_query(F.data == "vip_settitle_info")
+async def process_vip_title_info(call: CallbackQuery):
+    await call.message.answer(
+        "🏷️ <b>SHAXSIY UNVON (TAXALLUS) O'RNATISH</b>\n\n"
+        "O'zingizga o'yinda ko'rinadigan shaxsiy taxallus qo'yish uchun quyidagi buyruqni yuboring:\n"
+        "<code>/settitle Don Karleone</code>\n"
+        "yoki <code>/settitle Qora Qoplon</code>\n\n"
+        "<i>Eslatma: Bu imkoniyat faqat VIP foydalanuvchilar va Adminlar uchun mavjud!</i>",
+        parse_mode="HTML"
+    )
+    await call.answer()
+
+@router.message(Command("settitle", "unvon"))
+async def cmd_set_custom_title(message: Message):
+    args = message.text.split(maxsplit=1)
+    if len(args) < 2:
+        await message.answer(
+            "🏷️ <b>Shaxsiy unvon o'rnatish:</b>\n"
+            "Foydalanish: <code>/settitle O'zbek Doni</code>",
+            parse_mode="HTML"
+        )
+        return
+
+    title = args[1].strip()
+    res = await db.set_custom_title(message.from_user.id, title)
+    if not res["success"]:
+        await message.answer(f"❌ {res['error']}")
+        return
+
+    await message.answer(f"✅ <b>Shaxsiy unvoningiz muvaffaqiyatli o'rnatildi:</b> <i>«{html.escape(res['title'])}»</i>!", parse_mode="HTML")
+
+# ==============================================================================
+# 24. KENGAYTIRILGAN O'YINCHI STATISTIKASI (/stats)
+# ==============================================================================
+@router.message(Command("stats", "statistika"))
+async def cmd_user_extended_stats(message: Message):
+    if message.chat.type != "private":
+        bot_info = await message.bot.get_me()
+        kb = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="📊 Statistikani ko'rish", url=f"https://t.me/{bot_info.username}?start=stats")]
+        ])
+        await message.answer(
+            f"📊 <b>{message.from_user.full_name}</b>, to'liq statistikangizni shaxsiy chatda ko'ring:",
+            reply_markup=kb,
+            parse_mode="HTML"
+        )
+        return
+
+    data = await db.get_extended_user_stats(message.from_user.id)
+    if not data or not data.get("user"):
+        await message.answer("❌ Profilingiz ma'lumotlari topilmadi!")
+        return
+
+    u = data["user"]
+    m = data["marriage"]
+    spouse_str = m.get("spouse", {}).get("full_name", "Yolg'iz") if m else "Yolg'iz"
+    clan = data.get("clan")
+    clan_str = f"{clan['name']} ({clan['role'].title()})" if clan else "Klansiz"
+    vip_str = f"👑 VIP ({data['vip_days_left']} kun qoldi)" if data["is_vip"] else "Oddiy a'zo"
+    title_str = f"🏷️ <b>Unvon:</b> «{u['custom_title']}»\n" if u.get("custom_title") else ""
+
+    text = (
+        f"📊 <b>MUKAMMAL MAFIYA STATISTIKASI</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━━\n"
+        f"👤 <b>O'yinchi:</b> {html.escape(u['full_name'])}\n"
+        f"🆔 <b>Telegram ID:</b> <code>{u['id']}</code>\n"
+        f"{title_str}"
+        f"👑 <b>Status:</b> {vip_str}\n"
+        f"🏰 <b>Klan:</b> {clan_str}\n"
+        f"💍 <b>Oila:</b> {spouse_str}\n\n"
+        f"💰 <b>MOLIYAVIY AHVOL:</b>\n"
+        f"  • Naqd pul: <b>{u.get('pul', 0):,}</b> so'm\n"
+        f"  • Bankda: <b>{u.get('bank_pul', 0):,}</b> so'm\n"
+        f"  • Olmoslar: <b>{u.get('almaz', 0)}</b> 💎\n"
+        f"  • Avtomobillar: <b>{data['cars_count']}</b> ta mashina\n\n"
+        f"🎮 <b>O'YIN NATIJALARI:</b>\n"
+        f"  • O'ynalgan o'yinlar: <b>{u.get('games_played', 0)}</b> ta\n"
+        f"  • G'alabalar: <b>{u.get('games_won', 0)}</b> ta\n"
+        f"  • G'alaba foizi: <b>{data['winrate']}%</b>\n"
+        f"  • Daraja (Level): <b>{u.get('level', 1)}</b> ({u.get('xp', 0)} XP)\n"
+        f"  • Yutuqlar (Achievements): <b>{data['achievements_count']}</b> ta\n"
+        f"  • 🎟️ Battle Pass: <b>{data['battle_pass']['tier']}-bosqich</b> ({data['battle_pass']['pass_xp']} XP)\n"
+        f"━━━━━━━━━━━━━━━━━━━━━\n"
+    )
+    await message.answer(text, parse_mode="HTML")
 

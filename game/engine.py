@@ -1270,6 +1270,12 @@ class GameRoom:
             await db.update_balance(p.user_id, pul_diff=base_pul)
             xp_res = await db.add_xp(p.user_id, max(0, base_xp))
 
+            # Battle Pass XP
+            bp_xp = 35 if is_winner else 15
+            if is_vip:
+                bp_xp = int(bp_xp * 1.5)
+            await db.add_battle_pass_xp(p.user_id, bp_xp)
+
             # Quests & Achievements
             await db.progress_quest(p.user_id, "play_game", 1)
             if is_winner:
