@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: mafia-bot
+    runtime: python
+    plan: free
+    region: frankfurt
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "python main.py"
+    healthCheckPath: /ping
+    autoDeploy: true
+    envVars:
+      - key: BOT_TOKEN
+        value: 9281512762:AAHxvlEHAR49jkcP0mjDjoUUuENOk4pMm5Q
+      - key: BOT_USERNAME
+        value: Progressmafia_bot
+      - key: ADMIN_IDS
+        value: "8055412146"
+      - key: WEB_ADMIN_SECRET
+        value: mafia_admin_secret_8055412146
+      - key: PORT
+        value: "10000"
+      - key: RENDER_EXTERNAL_URL
+        value: https://mafia-bot-abhf.onrender.com
+      - key: SOFPAY_SHOP_KEY
+        value: sk_5b96eeebf9e5d73f32a50a423e06f22b
+      - key: SOFPAY_API_URL
+        value: https://sofpay.uz/api/v1

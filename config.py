@@ -19,8 +19,21 @@ if _env_path.exists():
         pass
 
 # Asosiy bot sozlamalari
-BOT_TOKEN = os.getenv("BOT_TOKEN", "8821320616:AAHTX9PHj4Ky8L5TJElc8oVU3oPmVHQowF8")
-BOT_USERNAME = os.getenv("BOT_USERNAME", "mafioznikiuzbot")
+_OLD_TOKEN = "8821320616:AAHTX9PHj4Ky8L5TJElc8oVU3oPmVHQowF8"
+_NEW_TOKEN = "9281512762:AAHxvlEHAR49jkcP0mjDjoUUuENOk4pMm5Q"
+
+_env_token = os.getenv("BOT_TOKEN", "").strip()
+if not _env_token or _env_token == _OLD_TOKEN:
+    BOT_TOKEN = _NEW_TOKEN
+else:
+    BOT_TOKEN = _env_token
+
+_env_user = os.getenv("BOT_USERNAME", "").strip()
+if not _env_user or _env_user.lower() == "mafioznikiuzbot":
+    BOT_USERNAME = "Progressmafia_bot"
+else:
+    BOT_USERNAME = _env_user
+
 ADMIN_IDS = [8055412146]
 
 # Web Admin Panel sozlamalari

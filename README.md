@@ -1,4 +1,4 @@
-# 🎩 Mafia Telegram Boti (@mafioznikiuzbot) & Web Admin Paneli
+# 🎩 Mafia Telegram Boti (@Progressmafia_bot) & Web Admin Paneli
 
 Professional, TrueMafia (@TrueMafiaBot) va Black Mafia uslubidagi to'liq avtomatlashtirilgan ko'p o'yinchili Telegram Mafia boti.
 

@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
-from config import WEB_ADMIN_SECRET, ADMIN_IDS
+from config import WEB_ADMIN_SECRET, ADMIN_IDS, BOT_USERNAME
 from database.db import db
 from game.engine import game_manager
 
@@ -33,16 +33,17 @@ def require_admin(request: Request):
 
     return False
 
-@app.get("/health")
-@app.get("/ping")
+@app.api_route("/health", methods=["GET", "HEAD", "POST"])
+@app.api_route("/ping", methods=["GET", "HEAD", "POST"])
 async def health_check():
     return JSONResponse({
         "status": "ok",
         "service": "mafia-bot",
+        "bot_username": BOT_USERNAME,
         "alive": True
     })
 
-@app.get("/login", response_class=HTMLResponse)
+@app.api_route("/login", methods=["GET", "HEAD"], response_class=HTMLResponse)
 async def login_page(request: Request):
     return templates.TemplateResponse(request=request, name="login.html", context={"error": None})
 
@@ -63,7 +64,7 @@ async def webapp_page(request: Request):
     return templates.TemplateResponse(request=request, name="webapp.html", context={})
 
 
-@app.get("/", response_class=HTMLResponse)
+@app.api_route("/", methods=["GET", "HEAD"], response_class=HTMLResponse)
 async def admin_dashboard(request: Request, q: str = ""):
     if not require_admin(request):
         return RedirectResponse(url="/login", status_code=status.HTTP_302_FOUND)
