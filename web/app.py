@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
-from config import WEB_ADMIN_SECRET, ADMIN_IDS, BOT_USERNAME
+from config import WEB_ADMIN_SECRET, ADMIN_IDS, BOT_USERNAME, BOT_NAME
 from database.db import db
 from game.engine import game_manager
 
@@ -127,7 +127,7 @@ async def admin_dashboard(request: Request, q: str = ""):
         "search_query": q,
         "admin_secret": WEB_ADMIN_SECRET,
         "bot_username": BOT_USERNAME,
-        "bot_name": getattr(config, "BOT_NAME", "Progress Mafia"),
+        "bot_name": BOT_NAME,
     })
 
 
