@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mafia Bot — Web Admin Dashboard</title>
+    <title>Progress Mafia — Web Admin Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
@@ -119,17 +119,21 @@
             </div>
             <div>
                 <h1 class="font-extrabold text-lg text-white tracking-wide flex items-center gap-2">
-                    MAFIA BOT DASHBOARD
-                    <span class="text-[10px] bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded-full border border-purple-500/30 uppercase tracking-wider">Admin v2.0</span>
+                    PROGRESS MAFIA DASHBOARD
+                    <span class="text-[10px] bg-emerald-500/20 text-emerald-300 px-2.5 py-0.5 rounded-full border border-emerald-500/30 uppercase tracking-wider font-mono font-bold">@{{ bot_username or 'Progressmafia_bot' }}</span>
                 </h1>
-                <p class="text-xs text-purple-400/60">Boshqaruv, Narxlar, Do'kon va Jonli O'yinlar</p>
+                <p class="text-xs text-purple-400/70">Yangi Bot Boshqaruv Paneli • Bot ID: 9281512762</p>
             </div>
         </div>
 
-        <div class="flex items-center gap-4">
+        <div class="flex items-center gap-3">
+            <a href="https://t.me/{{ bot_username or 'Progressmafia_bot' }}" target="_blank" class="btn btn-info text-xs px-3.5 py-1.5 rounded-xl font-bold flex items-center gap-1.5">
+                <span>🤖</span>
+                <span>@{{ bot_username or 'Progressmafia_bot' }}</span>
+            </a>
             <div class="hidden sm:flex items-center gap-2 text-xs bg-purple-950/60 border border-purple-500/30 px-3 py-1.5 rounded-xl">
                 <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                <span class="text-purple-200">Server Holati: Faol</span>
+                <span class="text-purple-200">Server: Faol</span>
             </div>
             <a href="/logout" class="btn btn-danger text-xs px-3.5 py-1.5 rounded-xl">
                 Chiqish 🚪

@@ -125,7 +125,9 @@ async def admin_dashboard(request: Request, q: str = ""):
         "exchange_rate": rate,
         "active_games": active_games,
         "search_query": q,
-        "admin_secret": WEB_ADMIN_SECRET
+        "admin_secret": WEB_ADMIN_SECRET,
+        "bot_username": BOT_USERNAME,
+        "bot_name": getattr(config, "BOT_NAME", "Progress Mafia"),
     })
 
 
