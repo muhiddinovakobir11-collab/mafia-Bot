@@ -58,5 +58,5 @@ SPONSOR_CHANNEL = os.getenv("SPONSOR_CHANNEL", "")
 
 # GitHub Cloud Baza Sinxronizatsiyasi
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
-GITHUB_REPO = os.getenv("GITHUB_REPO", "muhiddinovakobir11-collab/mafia-Bot")
+GITHUB_REPO = os.getenv("GITHUB_REPO", "muhiddinovakobir11-collab/mafiabot")
 GITHUB_DB_BACKUP_PATH = os.getenv("GITHUB_DB_BACKUP_PATH", "database/cloud_db_backup.db")
